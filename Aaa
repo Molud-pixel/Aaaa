@@ -1,362 +1,409 @@
--- ==================================================
--- MOBILE EXECUTOR GUI SCRIPT (AUTOMATED UI)
--- ==================================================
+-- Mobile-Friendly Speed & Jump Power GUI
+-- Place this as a LocalScript in StarterPlayerScripts or StarterGui
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local CoreGui = game:GetService("CoreGui")
-local TeleportService = game:GetService("TeleportService")
-local Stats = game:GetService("Stats")
+local RunService = game:GetService("RunService")
 
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
 
-local GUI_NAME = "MobileAdminHub_v1"
+-- Configuration
+local DEFAULT_SPEED = 16
+local DEFAULT_JUMP = 50
+local MAX_VALUE = 10000000
 
-local Config = {
-    Theme = "Dark",
-    Animations = true,
-    Notifications = true,
-    Scale = 1,
-    Opacity = 0.9,
-    DashCooldown = 2,
-    FlySpeed = 50,
-    SprintMultiplier = 1.5,
-    Waypoints = {}
-}
+-- State
+local guiVisible = true
+local currentSpeed = DEFAULT_SPEED
+local currentJump = DEFAULT_JUMP
+local sprintAnimEnabled = false
+local jumpAnimEnabled = false
+local isSprinting = false
 
-local Themes = {
-    Dark = {
-        Background = Color3.fromRGB(25, 25, 30),
-        TopBar = Color3.fromRGB(35, 35, 40),
-        Text = Color3.fromRGB(255, 255, 255),
-        Accent = Color3.fromRGB(0, 150, 255),
-        Element = Color3.fromRGB(45, 45, 50),
-        Border = Color3.fromRGB(60, 60, 65)
-    },
-    Light = {
-        Background = Color3.fromRGB(240, 240, 245),
-        TopBar = Color3.fromRGB(220, 220, 225),
-        Text = Color3.fromRGB(30, 30, 30),
-        Accent = Color3.fromRGB(0, 120, 210),
-        Element = Color3.fromRGB(255, 255, 255),
-        Border = Color3.fromRGB(200, 200, 200)
-    }
-}
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MobileSpeedJumpGUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
-local States = {
-    Noclip = false,
-    Fly = false,
-    InfJump = false,
-    DoubleJump = false,
-    Sprint = false,
-    DashReady = true,
-    SavedPosition = nil,
-    SessionStart = os.time()
-}
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 320, 0, 340)
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -170)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
 
-local Connections = {}
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = mainFrame
 
-local targetGuiParent = pcall(function() return CoreGui.Name end) and CoreGui or LocalPlayer:WaitForChild("PlayerGui")
-if targetGuiParent:FindFirstChild(GUI_NAME) then
-    targetGuiParent[GUI_NAME]:Destroy()
-end
-if _G.MobileAdminConnections then
-    for _, conn in pairs(_G.MobileAdminConnections) do
-        if typeof(conn) == "RBXScriptConnection" then conn:Disconnect() end
-    end
-end
-_G.MobileAdminConnections = Connections
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(60, 60, 70)
+mainStroke.Thickness = 1.5
+mainStroke.Parent = mainFrame
 
-local function Create(className, properties)
-    local inst = Instance.new(className)
-    for k, v in pairs(properties) do inst[k] = v end
-    return inst
-end
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
 
-local function Tween(obj, props, time)
-    if not Config.Animations then 
-        for k, v in pairs(props) do obj[k] = v end
-        return 
-    end
-    local t = TweenService:Create(obj, TweenInfo.new(time or 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
-    t:Play()
-    return t
-end
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.Parent = titleBar
 
-local function MakeDraggable(topbar, main)
-    local dragging, dragInput, dragStart, startPos
-    topbar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = main.Position
-        end
-    end)
-    topbar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            Tween(main, {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}, 0.1)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-end
+local titleFix = Instance.new("Frame")
+titleFix.Size = UDim2.new(1, 0, 0, 15)
+titleFix.Position = UDim2.new(0, 0, 1, -15)
+titleFix.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+titleFix.BorderSizePixel = 0
+titleFix.Parent = titleBar
 
-local ScreenGui = Create("ScreenGui", {Name = GUI_NAME, Parent = targetGuiParent, ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling})
-local MainPanel = Create("Frame", {Parent = ScreenGui, Size = UDim2.new(0, 400, 0, 300), Position = UDim2.new(0.5, -200, 0.5, -150), BackgroundColor3 = Themes[Config.Theme].Background, BackgroundTransparency = 1 - Config.Opacity, ClipsDescendants = true})
-Create("UICorner", {Parent = MainPanel, CornerRadius = UDim.new(0, 10)})
-Create("UIStroke", {Parent = MainPanel, Color = Themes[Config.Theme].Border, Thickness = 1})
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -50, 1, 0)
+titleLabel.Position = UDim2.new(0, 12, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Speed & Jump Control"
+titleLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
+titleLabel.TextSize = 16
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
 
-local TopBar = Create("Frame", {Parent = MainPanel, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = Themes[Config.Theme].TopBar, BackgroundTransparency = 1 - Config.Opacity})
-Create("UICorner", {Parent = TopBar, CornerRadius = UDim.new(0, 10)})
-local Title = Create("TextLabel", {Parent = TopBar, Size = UDim2.new(0, 150, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = "Mobile Hub", TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left})
+-- Hide Button
+local hideButton = Instance.new("TextButton")
+hideButton.Name = "HideButton"
+hideButton.Size = UDim2.new(0, 32, 0, 28)
+hideButton.Position = UDim2.new(1, -40, 0.5, -14)
+hideButton.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+hideButton.Text = "−"
+hideButton.TextColor3 = Color3.fromRGB(240, 240, 245)
+hideButton.TextSize = 20
+hideButton.Font = Enum.Font.GothamBold
+hideButton.Parent = titleBar
 
-local CloseBtn = Create("TextButton", {Parent = TopBar, Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -35, 0, 2), BackgroundTransparency = 1, Text = "X", TextColor3 = Color3.fromRGB(255, 50, 50), Font = Enum.Font.GothamBold, TextSize = 16})
-local MinBtn = Create("TextButton", {Parent = TopBar, Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundTransparency = 1, Text = "-", TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamBold, TextSize = 18})
+local hideCorner = Instance.new("UICorner")
+hideCorner.CornerRadius = UDim.new(0, 6)
+hideCorner.Parent = hideButton
 
-local SearchBar = Create("TextBox", {Parent = TopBar, Size = UDim2.new(0, 120, 0, 25), Position = UDim2.new(1, -200, 0, 5), BackgroundColor3 = Themes[Config.Theme].Element, TextColor3 = Themes[Config.Theme].Text, PlaceholderText = "Search...", Font = Enum.Font.Gotham, TextSize = 12, ClearTextOnFocus = false})
-Create("UICorner", {Parent = SearchBar, CornerRadius = UDim.new(0, 5)})
+-- Content Container
+local content = Instance.new("Frame")
+content.Name = "Content"
+content.Size = UDim2.new(1, -24, 1, -52)
+content.Position = UDim2.new(0, 12, 0, 46)
+content.BackgroundTransparency = 1
+content.Parent = mainFrame
 
-local ContentContainer = Create("Frame", {Parent = MainPanel, Size = UDim2.new(1, 0, 1, -35), Position = UDim2.new(0, 0, 0, 35), BackgroundTransparency = 1})
-local CategoryList = Create("ScrollingFrame", {Parent = ContentContainer, Size = UDim2.new(0, 100, 1, -10), Position = UDim2.new(0, 5, 0, 5), BackgroundTransparency = 1, ScrollBarThickness = 2, CanvasSize = UDim2.new(0,0,0,0)})
-Create("UIListLayout", {Parent = CategoryList, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5)})
-
-local FloatBtn = Create("TextButton", {Parent = ScreenGui, Size = UDim2.new(0, 40, 0, 40), Position = UDim2.new(0, 10, 0, 10), BackgroundColor3 = Themes[Config.Theme].Accent, Text = "UI", TextColor3 = Color3.fromRGB(255,255,255), Font = Enum.Font.GothamBold, TextSize = 16, Visible = false})
-Create("UICorner", {Parent = FloatBtn, CornerRadius = UDim.new(1, 0)})
-
-MakeDraggable(TopBar, MainPanel)
-MakeDraggable(FloatBtn, FloatBtn)
-
-local NotifContainer = Create("Frame", {Parent = ScreenGui, Size = UDim2.new(0, 200, 1, 0), Position = UDim2.new(1, -210, 0, 0), BackgroundTransparency = 1})
-Create("UIListLayout", {Parent = NotifContainer, VerticalAlignment = Enum.VerticalAlignment.Bottom, Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder})
-
-local function Notify(text)
-    if not Config.Notifications then return end
-    local notif = Create("TextLabel", {Parent = NotifContainer, Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Themes[Config.Theme].TopBar, TextColor3 = Themes[Config.Theme].Text, Text = " " .. text, Font = Enum.Font.GothamSemibold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1, TextTransparency = 1})
-    Create("UICorner", {Parent = notif, CornerRadius = UDim.new(0, 5)})
-    Create("UIStroke", {Parent = notif, Color = Themes[Config.Theme].Accent, Thickness = 1})
-    
-    Tween(notif, {BackgroundTransparency = 0.2, TextTransparency = 0, Position = UDim2.new(0,0,0,0)}, 0.3)
-    task.delay(3, function()
-        Tween(notif, {BackgroundTransparency = 1, TextTransparency = 1, Position = UDim2.new(1,0,0,0)}, 0.3)
-        task.wait(0.3)
-        notif:Destroy()
-    end)
+-- Helper: Create Label
+local function createLabel(text, yPos)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 0, 20)
+	label.Position = UDim2.new(0, 0, 0, yPos)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(200, 200, 210)
+	label.TextSize = 13
+	label.Font = Enum.Font.Gotham
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = content
+	return label
 end
 
-local ActiveTab = nil
-local SearchableElements = {}
+-- Helper: Create Slider
+local function createSlider(name, yPos, minVal, maxVal, defaultVal, callback)
+	local container = Instance.new("Frame")
+	container.Name = name .. "Container"
+	container.Size = UDim2.new(1, 0, 0, 50)
+	container.Position = UDim2.new(0, 0, 0, yPos)
+	container.BackgroundTransparency = 1
+	container.Parent = content
 
-local function AddCategory(name)
-    local tabBtn = Create("TextButton", {Parent = CategoryList, Size = UDim2.new(1, 0, 0, 25), BackgroundColor3 = Themes[Config.Theme].Element, Text = name, TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.Gotham, TextSize = 12})
-    Create("UICorner", {Parent = tabBtn, CornerRadius = UDim.new(0, 5)})
-    
-    local scrollFrame = Create("ScrollingFrame", {Parent = ContentContainer, Size = UDim2.new(1, -115, 1, -10), Position = UDim2.new(0, 110, 0, 5), BackgroundTransparency = 1, ScrollBarThickness = 3, Visible = false})
-    Create("UIListLayout", {Parent = scrollFrame, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5)})
-    
-    tabBtn.MouseButton1Click:Connect(function()
-        if ActiveTab then ActiveTab.Visible = false end
-        scrollFrame.Visible = true
-        ActiveTab = scrollFrame
-        Tween(scrollFrame, {CanvasPosition = Vector2.new(0,0)}, 0.2)
-    end)
-    if not ActiveTab then ActiveTab = scrollFrame; scrollFrame.Visible = true end
-    CategoryList.CanvasSize = UDim2.new(0, 0, 0, #CategoryList:GetChildren() * 30)
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.Name = "ValueLabel"
+	valueLabel.Size = UDim2.new(1, 0, 0, 18)
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Text = name .. ": " .. tostring(defaultVal)
+	valueLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+	valueLabel.TextSize = 12
+	valueLabel.Font = Enum.Font.Gotham
+	valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+	valueLabel.Parent = container
 
-    local function RegisterElement(frame, elName)
-        table.insert(SearchableElements, {Frame = frame, Name = elName:lower()})
-    end
+	local track = Instance.new("Frame")
+	track.Name = "Track"
+	track.Size = UDim2.new(1, 0, 0, 8)
+	track.Position = UDim2.new(0, 0, 0, 28)
+	track.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+	track.BorderSizePixel = 0
+	track.Parent = container
 
-    local TabObj = {}
-    function TabObj:AddButton(text, callback)
-        local btn = Create("TextButton", {Parent = scrollFrame, Size = UDim2.new(1, -10, 0, 30), BackgroundColor3 = Themes[Config.Theme].Element, Text = text, TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamSemibold, TextSize = 13})
-        Create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 5)})
-        btn.MouseButton1Click:Connect(function() Tween(btn, {Size = UDim2.new(1, -15, 0, 28)}, 0.1); task.wait(0.1); Tween(btn, {Size = UDim2.new(1, -10, 0, 30)}, 0.1); pcall(callback) end)
-        RegisterElement(btn, text)
-        scrollFrame.CanvasSize = UDim2.new(0,0,0, #scrollFrame:GetChildren() * 35)
-    end
-    
-    function TabObj:AddToggle(text, callback)
-        local frame = Create("Frame", {Parent = scrollFrame, Size = UDim2.new(1, -10, 0, 30), BackgroundColor3 = Themes[Config.Theme].Element})
-        Create("UICorner", {Parent = frame, CornerRadius = UDim.new(0, 5)})
-        local label = Create("TextLabel", {Parent = frame, Size = UDim2.new(0.7, 0, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = text, TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamSemibold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left})
-        local btn = Create("TextButton", {Parent = frame, Size = UDim2.new(0, 40, 0, 20), Position = UDim2.new(1, -50, 0.5, -10), BackgroundColor3 = Color3.fromRGB(100, 100, 100), Text = ""})
-        Create("UICorner", {Parent = btn, CornerRadius = UDim.new(1, 0)})
-        local indicator = Create("Frame", {Parent = btn, Size = UDim2.new(0, 16, 0, 16), Position = UDim2.new(0, 2, 0.5, -8), BackgroundColor3 = Color3.fromRGB(255,255,255)})
-        Create("UICorner", {Parent = indicator, CornerRadius = UDim.new(1, 0)})
-        
-        local state = false
-        btn.MouseButton1Click:Connect(function()
-            state = not state
-            Tween(indicator, {Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}, 0.2)
-            Tween(btn, {BackgroundColor3 = state and Themes[Config.Theme].Accent or Color3.fromRGB(100, 100, 100)}, 0.2)
-            pcall(callback, state)
-        end)
-        RegisterElement(frame, text)
-        scrollFrame.CanvasSize = UDim2.new(0,0,0, #scrollFrame:GetChildren() * 35)
-        return function(newState) state = newState; Tween(indicator, {Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}, 0.2); Tween(btn, {BackgroundColor3 = state and Themes[Config.Theme].Accent or Color3.fromRGB(100, 100, 100)}, 0.2) end
-    end
-    
-    function TabObj:AddSlider(text, min, max, callback)
-        local frame = Create("Frame", {Parent = scrollFrame, Size = UDim2.new(1, -10, 0, 40), BackgroundColor3 = Themes[Config.Theme].Element})
-        Create("UICorner", {Parent = frame, CornerRadius = UDim.new(0, 5)})
-        local label = Create("TextLabel", {Parent = frame, Size = UDim2.new(1, -10, 0.5, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = text, TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamSemibold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left})
-        local valLabel = Create("TextLabel", {Parent = frame, Size = UDim2.new(0, 30, 0.5, 0), Position = UDim2.new(1, -40, 0, 0), BackgroundTransparency = 1, Text = tostring(min), TextColor3 = Themes[Config.Theme].Accent, Font = Enum.Font.GothamBold, TextSize = 12})
-        local bar = Create("TextButton", {Parent = frame, Size = UDim2.new(1, -20, 0, 5), Position = UDim2.new(0, 10, 0.7, 0), BackgroundColor3 = Color3.fromRGB(100, 100, 100), Text = ""})
-        local fill = Create("Frame", {Parent = bar, Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Themes[Config.Theme].Accent})
-        
-        local dragging = false
-        local function Update(input)
-            local pos = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
-            local val = math.floor(min + (max - min) * pos)
-            fill.Size = UDim2.new(pos, 0, 1, 0)
-            valLabel.Text = tostring(val)
-            pcall(callback, val)
-        end
-        bar.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; Update(input) end end)
-        UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
-        UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then Update(input) end end)
-        RegisterElement(frame, text)
-        scrollFrame.CanvasSize = UDim2.new(0,0,0, #scrollFrame:GetChildren() * 45)
-    end
-    
-    function TabObj:AddInput(text, callback)
-        local frame = Create("Frame", {Parent = scrollFrame, Size = UDim2.new(1, -10, 0, 30), BackgroundColor3 = Themes[Config.Theme].Element})
-        Create("UICorner", {Parent = frame, CornerRadius = UDim.new(0, 5)})
-        local label = Create("TextLabel", {Parent = frame, Size = UDim2.new(0.5, 0, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = text, TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamSemibold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left})
-        local box = Create("TextBox", {Parent = frame, Size = UDim2.new(0.4, 0, 0, 20), Position = UDim2.new(0.6, -10, 0.5, -10), BackgroundColor3 = Themes[Config.Theme].Background, TextColor3 = Themes[Config.Theme].Text, Text = "", PlaceholderText = "Input...", Font = Enum.Font.Gotham, TextSize = 12, ClearTextOnFocus = false})
-        Create("UICorner", {Parent = box, CornerRadius = UDim.new(0, 3)})
-        box.FocusLost:Connect(function() pcall(callback, box.Text) end)
-        RegisterElement(frame, text)
-        scrollFrame.CanvasSize = UDim2.new(0,0,0, #scrollFrame:GetChildren() * 35)
-    end
+	local trackCorner = Instance.new("UICorner")
+	trackCorner.CornerRadius = UDim.new(0, 4)
+	trackCorner.Parent = track
 
-    function TabObj:AddLabel(text)
-        local lbl = Create("TextLabel", {Parent = scrollFrame, Size = UDim2.new(1, -10, 0, 20), BackgroundTransparency = 1, Text = text, TextColor3 = Themes[Config.Theme].Accent, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center})
-        RegisterElement(lbl, text)
-        scrollFrame.CanvasSize = UDim2.new(0,0,0, #scrollFrame:GetChildren() * 25)
-        return lbl
-    end
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(80, 140, 255)
+	fill.BorderSizePixel = 0
+	fill.Parent = track
 
-    return TabObj
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(0, 4)
+	fillCorner.Parent = fill
+
+	local knob = Instance.new("Frame")
+	knob.Name = "Knob"
+	knob.Size = UDim2.new(0, 20, 0, 20)
+	knob.Position = UDim2.new((defaultVal - minVal) / (maxVal - minVal), -10, 0.5, -10)
+	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	knob.BorderSizePixel = 0
+	knob.ZIndex = 2
+	knob.Parent = track
+
+	local knobCorner = Instance.new("UICorner")
+	knobCorner.CornerRadius = UDim.new(1, 0)
+	knobCorner.Parent = knob
+
+	local dragging = false
+
+	local function updateSlider(inputPos)
+		local relativeX = math.clamp((inputPos.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+		local value = math.floor(minVal + relativeX * (maxVal - minVal))
+		fill.Size = UDim2.new(relativeX, 0, 1, 0)
+		knob.Position = UDim2.new(relativeX, -10, 0.5, -10)
+		valueLabel.Text = name .. ": " .. tostring(value)
+		callback(value)
+	end
+
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			updateSlider(input.Position)
+		end
+	end)
+
+	knob.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			updateSlider(input.Position)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+
+	return container
 end
 
-SearchBar:GetPropertyChangedSignal("Text"):Connect(function()
-    local text = SearchBar.Text:lower()
-    for _, el in pairs(SearchableElements) do
-        if text == "" or string.find(el.Name, text) then
-            el.Frame.Visible = true
-        else
-            el.Frame.Visible = false
-        end
-    end
+-- Helper: Create Toggle
+local function createToggle(name, yPos, defaultState, callback)
+	local container = Instance.new("Frame")
+	container.Name = name .. "Toggle"
+	container.Size = UDim2.new(1, 0, 0, 36)
+	container.Position = UDim2.new(0, 0, 0, yPos)
+	container.BackgroundTransparency = 1
+	container.Parent = content
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -60, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = name
+	label.TextColor3 = Color3.fromRGB(200, 200, 210)
+	label.TextSize = 13
+	label.Font = Enum.Font.Gotham
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = container
+
+	local toggleBg = Instance.new("Frame")
+	toggleBg.Name = "ToggleBg"
+	toggleBg.Size = UDim2.new(0, 48, 0, 26)
+	toggleBg.Position = UDim2.new(1, -48, 0.5, -13)
+	toggleBg.BackgroundColor3 = defaultState and Color3.fromRGB(80, 140, 255) or Color3.fromRGB(55, 55, 65)
+	toggleBg.BorderSizePixel = 0
+	toggleBg.Parent = container
+
+	local toggleCorner = Instance.new("UICorner")
+	toggleCorner.CornerRadius = UDim.new(1, 0)
+	toggleCorner.Parent = toggleBg
+
+	local toggleKnob = Instance.new("Frame")
+	toggleKnob.Name = "Knob"
+	toggleKnob.Size = UDim2.new(0, 20, 0, 20)
+	toggleKnob.Position = defaultState and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
+	toggleKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	toggleKnob.BorderSizePixel = 0
+	toggleKnob.Parent = toggleBg
+
+	local knobCorner = Instance.new("UICorner")
+	knobCorner.CornerRadius = UDim.new(1, 0)
+	knobCorner.Parent = toggleKnob
+
+	local state = defaultState
+
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, 0, 1, 0)
+	button.BackgroundTransparency = 1
+	button.Text = ""
+	button.Parent = container
+
+	button.MouseButton1Click:Connect(function()
+		state = not state
+		local targetColor = state and Color3.fromRGB(80, 140, 255) or Color3.fromRGB(55, 55, 65)
+		local targetPos = state and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
+
+		TweenService:Create(toggleBg, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+		TweenService:Create(toggleKnob, TweenInfo.new(0.2), {Position = targetPos}):Play()
+
+		callback(state)
+	end)
+
+	return container
+end
+
+-- Build UI
+createLabel("Movement Settings", 0)
+
+createSlider("Speed", 24, 1, MAX_VALUE, DEFAULT_SPEED, function(value)
+	currentSpeed = value
+	if humanoid then
+		humanoid.WalkSpeed = value
+	end
 end)
 
-local Minimized = false
-MinBtn.MouseButton1Click:Connect(function()
-    Minimized = not Minimized
-    if Minimized then
-        Tween(MainPanel, {Size = UDim2.new(0, 400, 0, 35)}, 0.3)
-        ContentContainer.Visible = false
-    else
-        Tween(MainPanel, {Size = UDim2.new(0, 400, 0, 300)}, 0.3)
-        task.wait(0.3)
-        ContentContainer.Visible = true
-    end
+createSlider("Jump Power", 84, 1, MAX_VALUE, DEFAULT_JUMP, function(value)
+	currentJump = value
+	if humanoid then
+		humanoid.JumpPower = value
+		humanoid.UseJumpPower = true
+	end
 end)
 
-CloseBtn.MouseButton1Click:Connect(function()
-    Tween(MainPanel, {Size = UDim2.new(0,0,0,0)}, 0.3)
-    task.wait(0.3)
-    MainPanel.Visible = false
-    FloatBtn.Visible = true
-    Tween(FloatBtn, {Size = UDim2.new(0, 40, 0, 40)}, 0.2)
+createLabel("Animation Toggles", 150)
+
+createToggle("Detailed Sprint Animation", 174, false, function(enabled)
+	sprintAnimEnabled = enabled
 end)
 
-FloatBtn.MouseButton1Click:Connect(function()
-    FloatBtn.Visible = false
-    MainPanel.Visible = true
-    Tween(MainPanel, {Size = UDim2.new(0, 400, 0, 300)}, 0.3)
+createToggle("Detailed Jump Animation", 218, false, function(enabled)
+	jumpAnimEnabled = enabled
 end)
 
-local function GetChar()
-    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+-- Reset Button
+local resetButton = Instance.new("TextButton")
+resetButton.Name = "ResetButton"
+resetButton.Size = UDim2.new(1, 0, 0, 36)
+resetButton.Position = UDim2.new(0, 0, 0, 270)
+resetButton.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+resetButton.Text = "Reset to Default"
+resetButton.TextColor3 = Color3.fromRGB(240, 240, 245)
+resetButton.TextSize = 13
+resetButton.Font = Enum.Font.GothamSemibold
+resetButton.Parent = content
+
+local resetCorner = Instance.new("UICorner")
+resetCorner.CornerRadius = UDim.new(0, 8)
+resetCorner.Parent = resetButton
+
+resetButton.MouseButton1Click:Connect(function()
+	currentSpeed = DEFAULT_SPEED
+	currentJump = DEFAULT_JUMP
+	if humanoid then
+		humanoid.WalkSpeed = DEFAULT_SPEED
+		humanoid.JumpPower = DEFAULT_JUMP
+	end
+	-- Note: Full slider visual reset would require additional references; values are applied immediately
+end)
+
+-- Floating Show Button (appears when GUI is hidden)
+local showButton = Instance.new("TextButton")
+showButton.Name = "ShowButton"
+showButton.Size = UDim2.new(0, 50, 0, 50)
+showButton.Position = UDim2.new(0, 15, 0.5, -25)
+showButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+showButton.Text = "☰"
+showButton.TextColor3 = Color3.fromRGB(240, 240, 245)
+showButton.TextSize = 22
+showButton.Font = Enum.Font.GothamBold
+showButton.Visible = false
+showButton.Parent = screenGui
+
+local showCorner = Instance.new("UICorner")
+showCorner.CornerRadius = UDim.new(0, 12)
+showCorner.Parent = showButton
+
+local showStroke = Instance.new("UIStroke")
+showStroke.Color = Color3.fromRGB(60, 60, 70)
+showStroke.Thickness = 1.5
+showStroke.Parent = showButton
+
+-- Hide / Show Logic
+hideButton.MouseButton1Click:Connect(function()
+	guiVisible = false
+	mainFrame.Visible = false
+	showButton.Visible = true
+end)
+
+showButton.MouseButton1Click:Connect(function()
+	guiVisible = true
+	mainFrame.Visible = true
+	showButton.Visible = false
+end)
+
+-- Character handling
+local function onCharacterAdded(newCharacter)
+	character = newCharacter
+	humanoid = character:WaitForChild("Humanoid")
+	humanoid.WalkSpeed = currentSpeed
+	humanoid.JumpPower = currentJump
+	humanoid.UseJumpPower = true
 end
-local function GetHumanoid()
-    local c = GetChar()
-    return c:FindFirstChildOfClass("Humanoid")
-end
-local function GetRoot()
-    local c = GetChar()
-    return c:FindFirstChild("HumanoidRootPart")
-end
 
-local TabMovement = AddCategory("MOVEMENT")
-local TabFlight = AddCategory("FLIGHT")
-local TabCharacter = AddCategory("CHARACTER")
-local TabTeleport = AddCategory("TELEPORT")
-local TabCamera = AddCategory("CAMERA")
-local TabVisual = AddCategory("VISUAL")
-local TabUtils = AddCategory("UTILITIES")
-local TabSettings = AddCategory("SETTINGS")
+player.CharacterAdded:Connect(onCharacterAdded)
 
-TabMovement:AddLabel("-- SPEED --")
-TabMovement:AddSlider("1. WalkSpeed", 16, 200, function(v) local h = GetHumanoid(); if h then h.WalkSpeed = v end end)
-TabMovement:AddButton("2. Speed Preset: Normal", function() local h=GetHumanoid() if h then h.WalkSpeed=16 end Notify("Speed: Normal") end)
-TabMovement:AddButton("2. Speed Preset: Fast", function() local h=GetHumanoid() if h then h.WalkSpeed=50 end Notify("Speed: Fast") end)
-TabMovement:AddButton("2. Speed Preset: Extreme", function() local h=GetHumanoid() if h then h.WalkSpeed=150 end Notify("Speed: Extreme") end)
-
-TabMovement:AddLabel("-- JUMP --")
-TabMovement:AddSlider("3. JumpPower", 50, 300, function(v) local h = GetHumanoid(); if h then h.UseJumpPower = true; h.JumpPower = v end end)
-TabMovement:AddButton("4. Jump Preset: Normal", function() local h=GetHumanoid() if h then h.UseJumpPower=true; h.JumpPower=50 end Notify("Jump: Normal") end)
-TabMovement:AddButton("4. Jump Preset: High", function() local h=GetHumanoid() if h then h.UseJumpPower=true; h.JumpPower=150 end Notify("Jump: High") end)
-
-TabMovement:AddToggle("5. Infinite Jump", function(st)
-    States.InfJump = st
-    Notify("Inf Jump: " .. tostring(st))
+-- Basic sprint detection (mobile + keyboard)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
+		isSprinting = true
+	end
 end)
-table.insert(Connections, UserInputService.JumpRequest:Connect(function()
-    if States.InfJump then
-        local h = GetHumanoid()
-        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
-    end
-end))
 
-TabMovement:AddToggle("6. Double Jump", function(st)
-    States.DoubleJump = st
-    Notify("Double Jump: " .. tostring(st))
+UserInputService.InputEnded:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
+		isSprinting = false
+	end
 end)
-local jumpCount = 0
-table.insert(Connections, UserInputService.JumpRequest:Connect(function()
-    if States.DoubleJump then
-        local h = GetHumanoid()
-        if h and h:GetState() == Enum.HumanoidStateType.Freefall and jumpCount == 0 then
-            jumpCount = 1
-            h:ChangeState(Enum.HumanoidStateType.Jumping)
-        elseif h and h:GetState() == Enum.HumanoidStateType.Landed then
-            jumpCount = 0
-        end
-    end
-end))
 
-TabMovement:AddToggle("7. Sprint", function(st) States.Sprint = st; Notify("Sprint: " .. tostring(st)) end)
-TabMovement:AddSlider("8. Sprint Multiplier", 1, 5, function(v) Config.SprintMultiplier = v end)
-table.insert(Connections, RunService.Heartbeat:Connect(function()
-    if States.Sprint then
-        local h = GetHumanoid()
-        if h and h.MoveDirection.Magnitude > 0 then
-            h.WalkSpeed = 16 * Config.SprintMultiplier
-        else
-            if h then h.WalkSpeed = 16 end
-      
+-- Optional animation feedback (visual only; does not replace existing animations)
+RunService.Heartbeat:Connect(function()
+	if not humanoid or not character then return end
+
+	if sprintAnimEnabled and isSprinting and humanoid.MoveDirection.Magnitude > 0 then
+		-- Subtle visual feedback can be extended here (e.g., camera FOV or particle effects)
+	end
+
+	if jumpAnimEnabled and humanoid:GetState() == Enum.HumanoidStateType.Jumping then
+		-- Subtle visual feedback can be extended here
+	end
+end)
+
+print("Mobile Speed & Jump GUI loaded successfully.")
