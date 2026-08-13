@@ -1,40 +1,46 @@
--- Mobile-Friendly Speed & Jump Power GUI
--- Place this as a LocalScript in StarterPlayerScripts or StarterGui
+-- GUI móvil de Speed & Jump (versión compacta y fácil de configurar)
+-- LocalScript → StarterPlayerScripts o StarterGui
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 
--- Configuration
-local DEFAULT_SPEED = 16
-local DEFAULT_JUMP = 50
-local MAX_VALUE = 10000000
+-------------------------------------------------
+-- CONFIGURACIÓN FÁCIL (cambia estos valores)
+-------------------------------------------------
+local MIN_SPEED      = 1
+local MAX_SPEED      = 10000000
+local DEFAULT_SPEED  = 16
 
--- State
-local guiVisible = true
+local MIN_JUMP       = 1
+local MAX_JUMP       = 10000000
+local DEFAULT_JUMP   = 50
+
+-- Tamaño de la GUI (más pequeña)
+local GUI_WIDTH  = 260
+local GUI_HEIGHT = 280
+-------------------------------------------------
+
 local currentSpeed = DEFAULT_SPEED
-local currentJump = DEFAULT_JUMP
-local sprintAnimEnabled = false
-local jumpAnimEnabled = false
-local isSprinting = false
+local currentJump  = DEFAULT_JUMP
+local guiVisible   = true
 
--- Create ScreenGui
+-- Crear ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MobileSpeedJumpGUI"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Main Frame
+-- Frame principal (más pequeño)
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 320, 0, 340)
-mainFrame.Position = UDim2.new(0.5, -160, 0.5, -170)
+mainFrame.Size = UDim2.new(0, GUI_WIDTH, 0, GUI_HEIGHT)
+mainFrame.Position = UDim2.new(0.5, -GUI_WIDTH/2, 0.5, -GUI_HEIGHT/2)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -42,130 +48,126 @@ mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.CornerRadius = UDim.new(0, 10)
 mainCorner.Parent = mainFrame
 
 local mainStroke = Instance.new("UIStroke")
-mainStroke.Color = Color3.fromRGB(60, 60, 70)
-mainStroke.Thickness = 1.5
+mainStroke.Color = Color3.fromRGB(55, 55, 65)
+mainStroke.Thickness = 1
 mainStroke.Parent = mainFrame
 
--- Title Bar
+-- Barra de título
 local titleBar = Instance.new("Frame")
-titleBar.Name = "TitleBar"
-titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.Size = UDim2.new(1, 0, 0, 32)
 titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
 titleBar.BorderSizePixel = 0
 titleBar.Parent = mainFrame
 
 local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.CornerRadius = UDim.new(0, 10)
 titleCorner.Parent = titleBar
 
 local titleFix = Instance.new("Frame")
-titleFix.Size = UDim2.new(1, 0, 0, 15)
-titleFix.Position = UDim2.new(0, 0, 1, -15)
+titleFix.Size = UDim2.new(1, 0, 0, 12)
+titleFix.Position = UDim2.new(0, 0, 1, -12)
 titleFix.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
 titleFix.BorderSizePixel = 0
 titleFix.Parent = titleBar
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -50, 1, 0)
-titleLabel.Position = UDim2.new(0, 12, 0, 0)
+titleLabel.Size = UDim2.new(1, -40, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Speed & Jump Control"
-titleLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
-titleLabel.TextSize = 16
+titleLabel.Text = "Speed & Jump"
+titleLabel.TextColor3 = Color3.fromRGB(235, 235, 240)
+titleLabel.TextSize = 14
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = titleBar
 
--- Hide Button
+-- Botón ocultar
 local hideButton = Instance.new("TextButton")
-hideButton.Name = "HideButton"
-hideButton.Size = UDim2.new(0, 32, 0, 28)
-hideButton.Position = UDim2.new(1, -40, 0.5, -14)
+hideButton.Size = UDim2.new(0, 26, 0, 22)
+hideButton.Position = UDim2.new(1, -32, 0.5, -11)
 hideButton.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
 hideButton.Text = "−"
-hideButton.TextColor3 = Color3.fromRGB(240, 240, 245)
-hideButton.TextSize = 20
+hideButton.TextColor3 = Color3.fromRGB(235, 235, 240)
+hideButton.TextSize = 16
 hideButton.Font = Enum.Font.GothamBold
 hideButton.Parent = titleBar
 
 local hideCorner = Instance.new("UICorner")
-hideCorner.CornerRadius = UDim.new(0, 6)
+hideCorner.CornerRadius = UDim.new(0, 5)
 hideCorner.Parent = hideButton
 
--- Content Container
+-- Contenedor de contenido
 local content = Instance.new("Frame")
-content.Name = "Content"
-content.Size = UDim2.new(1, -24, 1, -52)
-content.Position = UDim2.new(0, 12, 0, 46)
+content.Size = UDim2.new(1, -16, 1, -40)
+content.Position = UDim2.new(0, 8, 0, 36)
 content.BackgroundTransparency = 1
 content.Parent = mainFrame
 
--- Helper: Create Label
-local function createLabel(text, yPos)
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 0, 20)
-	label.Position = UDim2.new(0, 0, 0, yPos)
-	label.BackgroundTransparency = 1
-	label.Text = text
-	label.TextColor3 = Color3.fromRGB(200, 200, 210)
-	label.TextSize = 13
-	label.Font = Enum.Font.Gotham
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Parent = content
-	return label
-end
-
--- Helper: Create Slider
-local function createSlider(name, yPos, minVal, maxVal, defaultVal, callback)
+-------------------------------------------------
+-- Función: crear control (slider + caja de texto)
+-------------------------------------------------
+local function createValueControl(name, yPos, minVal, maxVal, defaultVal, onChanged)
 	local container = Instance.new("Frame")
-	container.Name = name .. "Container"
-	container.Size = UDim2.new(1, 0, 0, 50)
+	container.Size = UDim2.new(1, 0, 0, 52)
 	container.Position = UDim2.new(0, 0, 0, yPos)
 	container.BackgroundTransparency = 1
 	container.Parent = content
 
-	local valueLabel = Instance.new("TextLabel")
-	valueLabel.Name = "ValueLabel"
-	valueLabel.Size = UDim2.new(1, 0, 0, 18)
-	valueLabel.BackgroundTransparency = 1
-	valueLabel.Text = name .. ": " .. tostring(defaultVal)
-	valueLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
-	valueLabel.TextSize = 12
-	valueLabel.Font = Enum.Font.Gotham
-	valueLabel.TextXAlignment = Enum.TextXAlignment.Left
-	valueLabel.Parent = container
+	-- Etiqueta + caja de texto editable
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(0.55, 0, 0, 18)
+	label.BackgroundTransparency = 1
+	label.Text = name
+	label.TextColor3 = Color3.fromRGB(190, 190, 200)
+	label.TextSize = 12
+	label.Font = Enum.Font.Gotham
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = container
 
+	local textBox = Instance.new("TextBox")
+	textBox.Size = UDim2.new(0.42, 0, 0, 20)
+	textBox.Position = UDim2.new(0.58, 0, 0, 0)
+	textBox.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+	textBox.Text = tostring(defaultVal)
+	textBox.TextColor3 = Color3.fromRGB(240, 240, 245)
+	textBox.TextSize = 12
+	textBox.Font = Enum.Font.Gotham
+	textBox.ClearTextOnFocus = false
+	textBox.Parent = container
+
+	local tbCorner = Instance.new("UICorner")
+	tbCorner.CornerRadius = UDim.new(0, 5)
+	tbCorner.Parent = textBox
+
+	-- Track del slider
 	local track = Instance.new("Frame")
-	track.Name = "Track"
-	track.Size = UDim2.new(1, 0, 0, 8)
+	track.Size = UDim2.new(1, 0, 0, 6)
 	track.Position = UDim2.new(0, 0, 0, 28)
 	track.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
 	track.BorderSizePixel = 0
 	track.Parent = container
 
 	local trackCorner = Instance.new("UICorner")
-	trackCorner.CornerRadius = UDim.new(0, 4)
+	trackCorner.CornerRadius = UDim.new(0, 3)
 	trackCorner.Parent = track
 
 	local fill = Instance.new("Frame")
-	fill.Name = "Fill"
 	fill.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
 	fill.BackgroundColor3 = Color3.fromRGB(80, 140, 255)
 	fill.BorderSizePixel = 0
 	fill.Parent = track
 
 	local fillCorner = Instance.new("UICorner")
-	fillCorner.CornerRadius = UDim.new(0, 4)
+	fillCorner.CornerRadius = UDim.new(0, 3)
 	fillCorner.Parent = fill
 
 	local knob = Instance.new("Frame")
-	knob.Name = "Knob"
-	knob.Size = UDim2.new(0, 20, 0, 20)
-	knob.Position = UDim2.new((defaultVal - minVal) / (maxVal - minVal), -10, 0.5, -10)
+	knob.Size = UDim2.new(0, 16, 0, 16)
+	knob.Position = UDim2.new((defaultVal - minVal) / (maxVal - minVal), -8, 0.5, -8)
 	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	knob.BorderSizePixel = 0
 	knob.ZIndex = 2
@@ -177,19 +179,26 @@ local function createSlider(name, yPos, minVal, maxVal, defaultVal, callback)
 
 	local dragging = false
 
-	local function updateSlider(inputPos)
-		local relativeX = math.clamp((inputPos.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-		local value = math.floor(minVal + relativeX * (maxVal - minVal))
-		fill.Size = UDim2.new(relativeX, 0, 1, 0)
-		knob.Position = UDim2.new(relativeX, -10, 0.5, -10)
-		valueLabel.Text = name .. ": " .. tostring(value)
-		callback(value)
+	local function setValue(val)
+		val = math.clamp(math.floor(val), minVal, maxVal)
+		local ratio = (val - minVal) / (maxVal - minVal)
+		fill.Size = UDim2.new(ratio, 0, 1, 0)
+		knob.Position = UDim2.new(ratio, -8, 0.5, -8)
+		textBox.Text = tostring(val)
+		onChanged(val)
+		return val
+	end
+
+	-- Slider
+	local function updateFromInput(inputPos)
+		local relative = math.clamp((inputPos.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+		setValue(minVal + relative * (maxVal - minVal))
 	end
 
 	track.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
-			updateSlider(input.Position)
+			updateFromInput(input.Position)
 		end
 	end)
 
@@ -201,7 +210,7 @@ local function createSlider(name, yPos, minVal, maxVal, defaultVal, callback)
 
 	UserInputService.InputChanged:Connect(function(input)
 		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			updateSlider(input.Position)
+			updateFromInput(input.Position)
 		end
 	end)
 
@@ -211,199 +220,156 @@ local function createSlider(name, yPos, minVal, maxVal, defaultVal, callback)
 		end
 	end)
 
-	return container
+	-- Caja de texto (permite números pequeños con precisión)
+	textBox.FocusLost:Connect(function(enterPressed)
+		local num = tonumber(textBox.Text)
+		if num then
+			setValue(num)
+		else
+			textBox.Text = tostring(currentSpeed) -- o el valor actual según el control
+		end
+	end)
+
+	return setValue
 end
 
--- Helper: Create Toggle
-local function createToggle(name, yPos, defaultState, callback)
+-------------------------------------------------
+-- Crear controles
+-------------------------------------------------
+local setSpeed = createValueControl("Speed", 4, MIN_SPEED, MAX_SPEED, DEFAULT_SPEED, function(v)
+	currentSpeed = v
+	if humanoid then humanoid.WalkSpeed = v end
+end)
+
+local setJump = createValueControl("Jump Power", 64, MIN_JUMP, MAX_JUMP, DEFAULT_JUMP, function(v)
+	currentJump = v
+	if humanoid then
+		humanoid.JumpPower = v
+		humanoid.UseJumpPower = true
+	end
+end)
+
+-- Toggles compactos
+local function createToggle(name, yPos, default, callback)
 	local container = Instance.new("Frame")
-	container.Name = name .. "Toggle"
-	container.Size = UDim2.new(1, 0, 0, 36)
+	container.Size = UDim2.new(1, 0, 0, 28)
 	container.Position = UDim2.new(0, 0, 0, yPos)
 	container.BackgroundTransparency = 1
 	container.Parent = content
 
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, -60, 1, 0)
+	label.Size = UDim2.new(1, -52, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Text = name
-	label.TextColor3 = Color3.fromRGB(200, 200, 210)
-	label.TextSize = 13
+	label.TextColor3 = Color3.fromRGB(190, 190, 200)
+	label.TextSize = 12
 	label.Font = Enum.Font.Gotham
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = container
 
-	local toggleBg = Instance.new("Frame")
-	toggleBg.Name = "ToggleBg"
-	toggleBg.Size = UDim2.new(0, 48, 0, 26)
-	toggleBg.Position = UDim2.new(1, -48, 0.5, -13)
-	toggleBg.BackgroundColor3 = defaultState and Color3.fromRGB(80, 140, 255) or Color3.fromRGB(55, 55, 65)
-	toggleBg.BorderSizePixel = 0
-	toggleBg.Parent = container
+	local bg = Instance.new("Frame")
+	bg.Size = UDim2.new(0, 42, 0, 22)
+	bg.Position = UDim2.new(1, -42, 0.5, -11)
+	bg.BackgroundColor3 = default and Color3.fromRGB(80, 140, 255) or Color3.fromRGB(55, 55, 65)
+	bg.BorderSizePixel = 0
+	bg.Parent = container
 
-	local toggleCorner = Instance.new("UICorner")
-	toggleCorner.CornerRadius = UDim.new(1, 0)
-	toggleCorner.Parent = toggleBg
+	local bgCorner = Instance.new("UICorner")
+	bgCorner.CornerRadius = UDim.new(1, 0)
+	bgCorner.Parent = bg
 
-	local toggleKnob = Instance.new("Frame")
-	toggleKnob.Name = "Knob"
-	toggleKnob.Size = UDim2.new(0, 20, 0, 20)
-	toggleKnob.Position = defaultState and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
-	toggleKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	toggleKnob.BorderSizePixel = 0
-	toggleKnob.Parent = toggleBg
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 16, 0, 16)
+	knob.Position = default and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	knob.BorderSizePixel = 0
+	knob.Parent = bg
 
 	local knobCorner = Instance.new("UICorner")
 	knobCorner.CornerRadius = UDim.new(1, 0)
-	knobCorner.Parent = toggleKnob
+	knobCorner.Parent = knob
 
-	local state = defaultState
+	local state = default
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, 0, 1, 0)
+	btn.BackgroundTransparency = 1
+	btn.Text = ""
+	btn.Parent = container
 
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, 0, 1, 0)
-	button.BackgroundTransparency = 1
-	button.Text = ""
-	button.Parent = container
-
-	button.MouseButton1Click:Connect(function()
+	btn.MouseButton1Click:Connect(function()
 		state = not state
-		local targetColor = state and Color3.fromRGB(80, 140, 255) or Color3.fromRGB(55, 55, 65)
-		local targetPos = state and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
-
-		TweenService:Create(toggleBg, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
-		TweenService:Create(toggleKnob, TweenInfo.new(0.2), {Position = targetPos}):Play()
-
+		local color = state and Color3.fromRGB(80, 140, 255) or Color3.fromRGB(55, 55, 65)
+		local pos = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+		TweenService:Create(bg, TweenInfo.new(0.18), {BackgroundColor3 = color}):Play()
+		TweenService:Create(knob, TweenInfo.new(0.18), {Position = pos}):Play()
 		callback(state)
 	end)
-
-	return container
 end
 
--- Build UI
-createLabel("Movement Settings", 0)
+createToggle("Sprint Animation", 128, false, function(enabled) end)
+createToggle("Jump Animation", 160, false, function(enabled) end)
 
-createSlider("Speed", 24, 1, MAX_VALUE, DEFAULT_SPEED, function(value)
-	currentSpeed = value
-	if humanoid then
-		humanoid.WalkSpeed = value
-	end
-end)
-
-createSlider("Jump Power", 84, 1, MAX_VALUE, DEFAULT_JUMP, function(value)
-	currentJump = value
-	if humanoid then
-		humanoid.JumpPower = value
-		humanoid.UseJumpPower = true
-	end
-end)
-
-createLabel("Animation Toggles", 150)
-
-createToggle("Detailed Sprint Animation", 174, false, function(enabled)
-	sprintAnimEnabled = enabled
-end)
-
-createToggle("Detailed Jump Animation", 218, false, function(enabled)
-	jumpAnimEnabled = enabled
-end)
-
--- Reset Button
-local resetButton = Instance.new("TextButton")
-resetButton.Name = "ResetButton"
-resetButton.Size = UDim2.new(1, 0, 0, 36)
-resetButton.Position = UDim2.new(0, 0, 0, 270)
-resetButton.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
-resetButton.Text = "Reset to Default"
-resetButton.TextColor3 = Color3.fromRGB(240, 240, 245)
-resetButton.TextSize = 13
-resetButton.Font = Enum.Font.GothamSemibold
-resetButton.Parent = content
+-- Botón Reset
+local resetBtn = Instance.new("TextButton")
+resetBtn.Size = UDim2.new(1, 0, 0, 30)
+resetBtn.Position = UDim2.new(0, 0, 0, 200)
+resetBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+resetBtn.Text = "Reset Default"
+resetBtn.TextColor3 = Color3.fromRGB(230, 230, 235)
+resetBtn.TextSize = 12
+resetBtn.Font = Enum.Font.GothamSemibold
+resetBtn.Parent = content
 
 local resetCorner = Instance.new("UICorner")
-resetCorner.CornerRadius = UDim.new(0, 8)
-resetCorner.Parent = resetButton
+resetCorner.CornerRadius = UDim.new(0, 6)
+resetCorner.Parent = resetBtn
 
-resetButton.MouseButton1Click:Connect(function()
-	currentSpeed = DEFAULT_SPEED
-	currentJump = DEFAULT_JUMP
-	if humanoid then
-		humanoid.WalkSpeed = DEFAULT_SPEED
-		humanoid.JumpPower = DEFAULT_JUMP
-	end
-	-- Note: Full slider visual reset would require additional references; values are applied immediately
+resetBtn.MouseButton1Click:Connect(function()
+	setSpeed(DEFAULT_SPEED)
+	setJump(DEFAULT_JUMP)
 end)
 
--- Floating Show Button (appears when GUI is hidden)
-local showButton = Instance.new("TextButton")
-showButton.Name = "ShowButton"
-showButton.Size = UDim2.new(0, 50, 0, 50)
-showButton.Position = UDim2.new(0, 15, 0.5, -25)
-showButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-showButton.Text = "☰"
-showButton.TextColor3 = Color3.fromRGB(240, 240, 245)
-showButton.TextSize = 22
-showButton.Font = Enum.Font.GothamBold
-showButton.Visible = false
-showButton.Parent = screenGui
+-- Botón flotante para mostrar
+local showBtn = Instance.new("TextButton")
+showBtn.Size = UDim2.new(0, 42, 0, 42)
+showBtn.Position = UDim2.new(0, 12, 0.5, -21)
+showBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+showBtn.Text = "☰"
+showBtn.TextColor3 = Color3.fromRGB(235, 235, 240)
+showBtn.TextSize = 18
+showBtn.Font = Enum.Font.GothamBold
+showBtn.Visible = false
+showBtn.Parent = screenGui
 
 local showCorner = Instance.new("UICorner")
-showCorner.CornerRadius = UDim.new(0, 12)
-showCorner.Parent = showButton
+showCorner.CornerRadius = UDim.new(0, 10)
+showCorner.Parent = showBtn
 
 local showStroke = Instance.new("UIStroke")
-showStroke.Color = Color3.fromRGB(60, 60, 70)
-showStroke.Thickness = 1.5
-showStroke.Parent = showButton
+showStroke.Color = Color3.fromRGB(55, 55, 65)
+showStroke.Thickness = 1
+showStroke.Parent = showBtn
 
--- Hide / Show Logic
+-- Lógica hide/show
 hideButton.MouseButton1Click:Connect(function()
 	guiVisible = false
 	mainFrame.Visible = false
-	showButton.Visible = true
+	showBtn.Visible = true
 end)
 
-showButton.MouseButton1Click:Connect(function()
+showBtn.MouseButton1Click:Connect(function()
 	guiVisible = true
 	mainFrame.Visible = true
-	showButton.Visible = false
+	showBtn.Visible = false
 end)
 
--- Character handling
-local function onCharacterAdded(newCharacter)
-	character = newCharacter
-	humanoid = character:WaitForChild("Humanoid")
+-- Respawn
+player.CharacterAdded:Connect(function(newChar)
+	character = newChar
+	humanoid = newChar:WaitForChild("Humanoid")
 	humanoid.WalkSpeed = currentSpeed
 	humanoid.JumpPower = currentJump
 	humanoid.UseJumpPower = true
-end
-
-player.CharacterAdded:Connect(onCharacterAdded)
-
--- Basic sprint detection (mobile + keyboard)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-	if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
-		isSprinting = true
-	end
 end)
 
-UserInputService.InputEnded:Connect(function(input)
-	if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
-		isSprinting = false
-	end
-end)
-
--- Optional animation feedback (visual only; does not replace existing animations)
-RunService.Heartbeat:Connect(function()
-	if not humanoid or not character then return end
-
-	if sprintAnimEnabled and isSprinting and humanoid.MoveDirection.Magnitude > 0 then
-		-- Subtle visual feedback can be extended here (e.g., camera FOV or particle effects)
-	end
-
-	if jumpAnimEnabled and humanoid:GetState() == Enum.HumanoidStateType.Jumping then
-		-- Subtle visual feedback can be extended here
-	end
-end)
-
-print("Mobile Speed & Jump GUI loaded successfully.")
+print("GUI compacta cargada. Usa las cajas de texto para valores pequeños con precisión.")
