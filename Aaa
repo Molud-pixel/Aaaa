@@ -1,0 +1,206 @@
+-- LocalScript: Menú de administrador solo para ti (móvil y arrastrable)
+-- Colocar en StarterPlayerScripts
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Crear RemoteEvent (debe existir también en el servidor)
+local RemoteEvent = Instance.new("RemoteEvent")
+RemoteEvent.Name = "AdminRemote"
+RemoteEvent.Parent = ReplicatedStorage
+
+local player = Players.LocalPlayer
+local gui = Instance.new("ScreenGui")
+gui.Name = "AdminMenu"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- Marco principal
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 280, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -140, 0.5, -200)
+mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+mainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+mainFrame.Active = true
+mainFrame.Parent = gui
+
+-- Barra de título (para arrastrar)
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.Position = UDim2.new(0, 0, 0, 0)
+titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+titleBar.BorderColor3 = Color3.fromRGB(0, 0, 0)
+titleBar.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -50, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Admin (Solo yo)"
+titleLabel.TextColor3 = Color3.new(1, 1, 1)
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextSize = 20
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 40, 0, 40)
+closeButton.Position = UDim2.new(1, -40, 0, 0)
+closeButton.BackgroundTransparency = 0.5
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.Font = Enum.Font.SourceSansBold
+closeButton.TextSize = 18
+closeButton.Parent = titleBar
+closeButton.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
+
+-- Marco desplazable para los botones
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -10, 1, -50)
+scrollFrame.Position = UDim2.new(0, 5, 0, 45)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+scrollFrame.ScrollBarThickness = 8
+scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scrollFrame.Parent = mainFrame
+
+-- Lista de comandos (todos se aplican a ti)
+local commands = {
+	{Name = "Curar", NeedsValue = false},
+	{Name = "Velocidad", NeedsValue = true, ValueHint = "Velocidad (16-200)"},
+	{Name = "Salto", NeedsValue = true, ValueHint = "Salto (50-500)"},
+	{Name = "Volar", NeedsValue = false},
+	{Name = "Dejar de volar", NeedsValue = false},
+	{Name = "Reaparecer", NeedsValue = false},
+	{Name = "Modo Dios", NeedsValue = false},
+	{Name = "Invisibilidad", NeedsValue = false},
+	{Name = "Dar Espada", NeedsValue = false},
+	{Name = "Quitar Herramientas", NeedsValue = false},
+	{Name = "Noclip", NeedsValue = false},
+	{Name = "Congelar", NeedsValue = false},
+	{Name = "Descongelar", NeedsValue = false},
+	{Name = "Fuego Visual", NeedsValue = false},
+	{Name = "Hielo", NeedsValue = false},
+	{Name = "Chispas", NeedsValue = false},
+	{Name = "Sentar", NeedsValue = false},
+	{Name = "Bailar", NeedsValue = false},
+	{Name = "Aumentar MaxHealth", NeedsValue = false},
+	{Name = "Gravedad", NeedsValue = true, ValueHint = "Gravedad (196.2 normal)"},
+	{Name = "Tamaño", NeedsValue = true, ValueHint = "Multiplicador (1 = normal)"},
+	{Name = "Color", NeedsValue = false},
+}
+
+-- Crear botones
+for _, cmd in ipairs(commands) do
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -20, 0, 40)
+	button.Position = UDim2.new(0, 10, 0, 0)
+	button.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.Font = Enum.Font.SourceSans
+	button.TextSize = 18
+	button.Text = cmd.Name
+	button.Parent = scrollFrame
+
+	button.MouseButton1Click:Connect(function()
+		if cmd.NeedsValue then
+			showValueInput(cmd)
+		else
+			RemoteEvent:FireServer(cmd.Name, nil)
+		end
+	end)
+end
+
+-- Entrada de valor
+local valueInputFrame = Instance.new("Frame")
+valueInputFrame.Size = UDim2.new(1, -20, 0, 120)
+valueInputFrame.Position = UDim2.new(0, 10, 0, 40)
+valueInputFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+valueInputFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+valueInputFrame.Visible = false
+valueInputFrame.Parent = mainFrame
+
+local valueLabel = Instance.new("TextLabel")
+valueLabel.Size = UDim2.new(1, -20, 0, 30)
+valueLabel.Position = UDim2.new(0, 10, 0, 5)
+valueLabel.BackgroundTransparency = 1
+valueLabel.Text = "Introduce un valor:"
+valueLabel.TextColor3 = Color3.new(1, 1, 1)
+valueLabel.Font = Enum.Font.SourceSans
+valueLabel.TextSize = 18
+valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+valueLabel.Parent = valueInputFrame
+
+local valueTextBox = Instance.new("TextBox")
+valueTextBox.Size = UDim2.new(1, -20, 0, 35)
+valueTextBox.Position = UDim2.new(0, 10, 0, 40)
+valueTextBox.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+valueTextBox.TextColor3 = Color3.new(1, 1, 1)
+valueTextBox.Font = Enum.Font.SourceSans
+valueTextBox.TextSize = 18
+valueTextBox.PlaceholderText = "Valor"
+valueTextBox.Parent = valueInputFrame
+
+local confirmButton = Instance.new("TextButton")
+confirmButton.Size = UDim2.new(1, -20, 0, 35)
+confirmButton.Position = UDim2.new(0, 10, 0, 80)
+confirmButton.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
+confirmButton.Text = "Confirmar"
+confirmButton.TextColor3 = Color3.new(1, 1, 1)
+confirmButton.Font = Enum.Font.SourceSansBold
+confirmButton.TextSize = 18
+confirmButton.Parent = valueInputFrame
+
+local currentCommand = nil
+
+function showValueInput(cmd)
+	currentCommand = cmd
+	valueLabel.Text = cmd.ValueHint or "Introduce un valor:"
+	valueTextBox.Text = ""
+	valueInputFrame.Visible = true
+	scrollFrame.Visible = false
+end
+
+confirmButton.MouseButton1Click:Connect(function()
+	local value = tonumber(valueTextBox.Text)
+	if value then
+		RemoteEvent:FireServer(currentCommand.Name, value)
+		valueInputFrame.Visible = false
+		scrollFrame.Visible = true
+		currentCommand = nil
+	else
+		valueTextBox.Text = ""
+		valueTextBox.PlaceholderText = "Número inválido"
+	end
+end)
+
+-- Arrastre táctil
+local dragging = false
+local dragStartPos = nil
+local frameStartPos = nil
+
+titleBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStartPos = input.Position
+		frameStartPos = mainFrame.Position
+	end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - dragStartPos
+		mainFrame.Position = UDim2.new(frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X, frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y)
+	end
+end)
+
+titleBar.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
