@@ -1,5 +1,14 @@
--- GUI móvil de Speed & Jump (versión compacta y fácil de configurar)
--- LocalScript → StarterPlayerScripts o StarterGui
+-- 馃寛 SPEED & JUMP - GUI ARCO脥RIS + ANIMACIONES REALES
+-- Basado en la versi贸n compacta subida por el usuario.
+-- Incluye:
+--   * GUI con degradado arco铆ris animado
+--   * Animaci贸n real de sprint/caminar mediante Animator
+--   * Animaci贸n real de salto
+--   * Auto Sprint (opci贸n extra)
+--   * Rainbow Trail (opci贸n extra)
+--
+-- GUI m贸vil de Speed & Jump (versi贸n compacta y f谩cil de configurar)
+-- LocalScript 鈫� StarterPlayerScripts o StarterGui
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -10,7 +19,7 @@ local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 
 -------------------------------------------------
--- CONFIGURACIÓN FÁCIL (cambia estos valores)
+-- CONFIGURACI脫N F脕CIL (cambia estos valores)
 -------------------------------------------------
 local MIN_SPEED      = 1
 local MAX_SPEED      = 10000000
@@ -20,9 +29,9 @@ local MIN_JUMP       = 1
 local MAX_JUMP       = 10000000
 local DEFAULT_JUMP   = 50
 
--- Tamaño de la GUI (más pequeña)
+-- Tama帽o de la GUI (m谩s peque帽a)
 local GUI_WIDTH  = 260
-local GUI_HEIGHT = 280
+local GUI_HEIGHT = 340
 -------------------------------------------------
 
 local currentSpeed = DEFAULT_SPEED
@@ -36,7 +45,7 @@ screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Frame principal (más pequeño)
+-- Frame principal (m谩s peque帽o)
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, GUI_WIDTH, 0, GUI_HEIGHT)
@@ -47,6 +56,38 @@ mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
+-- Fondo arco铆ris animado para la GUI.
+local mainGradient = Instance.new("UIGradient")
+mainGradient.Rotation = 25
+mainGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 80, 110)),
+	ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 170, 70)),
+	ColorSequenceKeypoint.new(0.34, Color3.fromRGB(255, 235, 80)),
+	ColorSequenceKeypoint.new(0.51, Color3.fromRGB(80, 255, 150)),
+	ColorSequenceKeypoint.new(0.68, Color3.fromRGB(80, 190, 255)),
+	ColorSequenceKeypoint.new(0.85, Color3.fromRGB(130, 100, 255)),
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 90, 220)),
+})
+mainGradient.Parent = mainFrame
+
+local rainbowConnection = game:GetService("RunService").RenderStepped:Connect(function(dt)
+	rainbowHue = (rainbowHue + dt * 0.08) % 1
+	local shifted = {}
+	local colors = {
+		Color3.fromHSV((rainbowHue + 0.00) % 1, 0.85, 1),
+		Color3.fromHSV((rainbowHue + 0.17) % 1, 0.85, 1),
+		Color3.fromHSV((rainbowHue + 0.34) % 1, 0.85, 1),
+		Color3.fromHSV((rainbowHue + 0.51) % 1, 0.85, 1),
+		Color3.fromHSV((rainbowHue + 0.68) % 1, 0.85, 1),
+		Color3.fromHSV((rainbowHue + 0.85) % 1, 0.85, 1),
+	}
+	for i = 1, #colors do
+		shifted[i] = ColorSequenceKeypoint.new((i - 1) / (#colors - 1), colors[i])
+	end
+	mainGradient.Color = ColorSequence.new(shifted)
+	mainGradient.Offset = Vector2.new((rainbowHue * 2) % 1 - 0.5, 0)
+end)
+
 local mainCorner = Instance.new("UICorner")
 mainCorner.CornerRadius = UDim.new(0, 10)
 mainCorner.Parent = mainFrame
@@ -56,7 +97,7 @@ mainStroke.Color = Color3.fromRGB(55, 55, 65)
 mainStroke.Thickness = 1
 mainStroke.Parent = mainFrame
 
--- Barra de título
+-- Barra de t铆tulo
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 32)
 titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
@@ -78,19 +119,19 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -40, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Speed & Jump"
+titleLabel.Text = "馃寛 Speed & Jump"
 titleLabel.TextColor3 = Color3.fromRGB(235, 235, 240)
 titleLabel.TextSize = 14
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = titleBar
 
--- Botón ocultar
+-- Bot贸n ocultar
 local hideButton = Instance.new("TextButton")
 hideButton.Size = UDim2.new(0, 26, 0, 22)
 hideButton.Position = UDim2.new(1, -32, 0.5, -11)
 hideButton.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
-hideButton.Text = "−"
+hideButton.Text = "鈭�"
 hideButton.TextColor3 = Color3.fromRGB(235, 235, 240)
 hideButton.TextSize = 16
 hideButton.Font = Enum.Font.GothamBold
@@ -108,7 +149,7 @@ content.BackgroundTransparency = 1
 content.Parent = mainFrame
 
 -------------------------------------------------
--- Función: crear control (slider + caja de texto)
+-- Funci贸n: crear control (slider + caja de texto)
 -------------------------------------------------
 local function createValueControl(name, yPos, minVal, maxVal, defaultVal, onChanged)
 	local container = Instance.new("Frame")
@@ -220,13 +261,13 @@ local function createValueControl(name, yPos, minVal, maxVal, defaultVal, onChan
 		end
 	end)
 
-	-- Caja de texto (permite números pequeños con precisión)
+	-- Caja de texto (permite n煤meros peque帽os con precisi贸n)
 	textBox.FocusLost:Connect(function(enterPressed)
 		local num = tonumber(textBox.Text)
 		if num then
 			setValue(num)
 		else
-			textBox.Text = tostring(currentSpeed) -- o el valor actual según el control
+			textBox.Text = tostring(currentSpeed) -- o el valor actual seg煤n el control
 		end
 	end)
 
@@ -306,13 +347,190 @@ local function createToggle(name, yPos, default, callback)
 	end)
 end
 
-createToggle("Sprint Animation", 128, false, function(enabled) end)
-createToggle("Jump Animation", 160, false, function(enabled) end)
+-------------------------------------------------
+-- ANIMACIONES REALES + OPCIONES EXTRA
+-------------------------------------------------
 
--- Botón Reset
+local sprintEnabled = false
+local jumpAnimEnabled = false
+local autoSprintEnabled = false
+local rainbowTrailEnabled = false
+
+local sprintTrack
+local jumpTrack
+local rainbowHue = 0
+local trail
+
+-- IDs R15 cl谩sicos de Roblox para caminar/correr y saltar.
+-- Se cargan mediante Animator para que sean animaciones reales.
+local WALK_ANIMATION_ID = "rbxassetid://507777826"
+local RUN_ANIMATION_ID  = "rbxassetid://507767714"
+local JUMP_ANIMATION_ID = "rbxassetid://507765000"
+
+local function stopTrack(track)
+	if track then
+		track:Stop(0.15)
+	end
+end
+
+local function loadAnimationTrack(animationId, priority, looped)
+	if not humanoid then return nil end
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		animator = Instance.new("Animator")
+		animator.Parent = humanoid
+	end
+
+	local animation = Instance.new("Animation")
+	animation.AnimationId = animationId
+
+	local ok, track = pcall(function()
+		return animator:LoadAnimation(animation)
+	end)
+
+	if not ok or not track then
+		warn("No se pudo cargar la animaci贸n: " .. animationId)
+		return nil
+	end
+
+	track.Priority = priority
+	track.Looped = looped
+	return track
+end
+
+local function setupRealAnimations()
+	stopTrack(sprintTrack)
+	stopTrack(jumpTrack)
+	sprintTrack = nil
+	jumpTrack = nil
+
+	if sprintEnabled and humanoid then
+		sprintTrack = loadAnimationTrack(RUN_ANIMATION_ID, Enum.AnimationPriority.Movement, true)
+	end
+
+	if jumpAnimEnabled and humanoid then
+		jumpTrack = loadAnimationTrack(JUMP_ANIMATION_ID, Enum.AnimationPriority.Action, false)
+	end
+end
+
+local function createRainbowTrail()
+	if not character then return end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	if trail then
+		trail:Destroy()
+		trail = nil
+	end
+
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(0, 1.2, 0)
+	a0.Parent = root
+
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(0, -1.2, 0)
+	a1.Parent = root
+
+	trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Lifetime = 0.45
+	trail.MinLength = 0.05
+	trail.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.05),
+		NumberSequenceKeypoint.new(1, 1)
+	})
+	trail.WidthScale = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.85),
+		NumberSequenceKeypoint.new(1, 0)
+	})
+	trail.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0.00, Color3.fromHSV(0.00, 1, 1)),
+		ColorSequenceKeypoint.new(0.17, Color3.fromHSV(0.17, 1, 1)),
+		ColorSequenceKeypoint.new(0.34, Color3.fromHSV(0.34, 1, 1)),
+		ColorSequenceKeypoint.new(0.51, Color3.fromHSV(0.51, 1, 1)),
+		ColorSequenceKeypoint.new(0.68, Color3.fromHSV(0.68, 1, 1)),
+		ColorSequenceKeypoint.new(0.85, Color3.fromHSV(0.85, 1, 1)),
+		ColorSequenceKeypoint.new(1.00, Color3.fromHSV(1.00, 1, 1)),
+	})
+	trail.Parent = root
+end
+
+local function setRainbowTrail(enabled)
+	rainbowTrailEnabled = enabled
+	if enabled then
+		createRainbowTrail()
+	elseif trail then
+		trail:Destroy()
+		trail = nil
+	end
+end
+
+-- Sprint: fuerza la animaci贸n mientras el personaje se mueve.
+createToggle("Sprint Animation", 128, false, function(enabled)
+	sprintEnabled = enabled
+	setupRealAnimations()
+end)
+
+-- Salto: reproduce una animaci贸n real al entrar en el estado Jumping.
+createToggle("Jump Animation", 160, false, function(enabled)
+	jumpAnimEnabled = enabled
+	setupRealAnimations()
+end)
+
+-- Opci贸n nueva 1: acelera autom谩ticamente al moverse.
+createToggle("Auto Sprint", 192, false, function(enabled)
+	autoSprintEnabled = enabled
+	if humanoid then
+		humanoid.WalkSpeed = enabled and math.max(currentSpeed, 24) or currentSpeed
+	end
+end)
+
+-- Opci贸n nueva 2: deja una estela arco铆ris al moverse.
+createToggle("Rainbow Trail", 224, false, function(enabled)
+	setRainbowTrail(enabled)
+end)
+
+-- Control de animaciones y Auto Sprint.
+local function connectCharacterEvents()
+	if not humanoid then return end
+
+	humanoid.Running:Connect(function(speed)
+		if sprintTrack then
+			if sprintEnabled and speed > 1 and humanoid:GetState() ~= Enum.HumanoidStateType.Jumping then
+				if not sprintTrack.IsPlaying then
+					sprintTrack:Play(0.15, 1, 1.05)
+				end
+				sprintTrack:AdjustSpeed(math.clamp(speed / 16, 0.75, 2.2))
+			else
+				stopTrack(sprintTrack)
+			end
+		end
+
+		if autoSprintEnabled then
+			if speed > 1 then
+				humanoid.WalkSpeed = math.max(currentSpeed, 24)
+			else
+				humanoid.WalkSpeed = currentSpeed
+			end
+		end
+	end)
+
+	humanoid.StateChanged:Connect(function(_, newState)
+		if jumpAnimEnabled and jumpTrack and newState == Enum.HumanoidStateType.Jumping then
+			jumpTrack:Play(0.08, 1, 1)
+		elseif newState == Enum.HumanoidStateType.Landed then
+			stopTrack(jumpTrack)
+		end
+	end)
+end
+
+connectCharacterEvents()
+
+-- Bot贸n Reset
 local resetBtn = Instance.new("TextButton")
 resetBtn.Size = UDim2.new(1, 0, 0, 30)
-resetBtn.Position = UDim2.new(0, 0, 0, 200)
+resetBtn.Position = UDim2.new(0, 0, 0, 260)
 resetBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
 resetBtn.Text = "Reset Default"
 resetBtn.TextColor3 = Color3.fromRGB(230, 230, 235)
@@ -327,14 +545,26 @@ resetCorner.Parent = resetBtn
 resetBtn.MouseButton1Click:Connect(function()
 	setSpeed(DEFAULT_SPEED)
 	setJump(DEFAULT_JUMP)
+
+	sprintEnabled = false
+	jumpAnimEnabled = false
+	autoSprintEnabled = false
+	setRainbowTrail(false)
+
+	setupRealAnimations()
+	if humanoid then
+		humanoid.WalkSpeed = DEFAULT_SPEED
+		humanoid.JumpPower = DEFAULT_JUMP
+		humanoid.UseJumpPower = true
+	end
 end)
 
--- Botón flotante para mostrar
+-- Bot贸n flotante para mostrar
 local showBtn = Instance.new("TextButton")
 showBtn.Size = UDim2.new(0, 42, 0, 42)
 showBtn.Position = UDim2.new(0, 12, 0.5, -21)
 showBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-showBtn.Text = "☰"
+showBtn.Text = "鈽�"
 showBtn.TextColor3 = Color3.fromRGB(235, 235, 240)
 showBtn.TextSize = 18
 showBtn.Font = Enum.Font.GothamBold
@@ -350,7 +580,7 @@ showStroke.Color = Color3.fromRGB(55, 55, 65)
 showStroke.Thickness = 1
 showStroke.Parent = showBtn
 
--- Lógica hide/show
+-- L贸gica hide/show
 hideButton.MouseButton1Click:Connect(function()
 	guiVisible = false
 	mainFrame.Visible = false
@@ -367,9 +597,17 @@ end)
 player.CharacterAdded:Connect(function(newChar)
 	character = newChar
 	humanoid = newChar:WaitForChild("Humanoid")
-	humanoid.WalkSpeed = currentSpeed
+	humanoid.WalkSpeed = autoSprintEnabled and math.max(currentSpeed, 24) or currentSpeed
 	humanoid.JumpPower = currentJump
 	humanoid.UseJumpPower = true
+
+	-- Reconectar eventos y volver a cargar las animaciones tras respawn.
+	connectCharacterEvents()
+	setupRealAnimations()
+
+	if rainbowTrailEnabled then
+		createRainbowTrail()
+	end
 end)
 
-print("GUI compacta cargada. Usa las cajas de texto para valores pequeños con precisión.")
+print("馃寛 GUI Speed & Jump cargada: animaciones reales + Auto Sprint + Rainbow Trail.")
