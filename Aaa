@@ -1,434 +1,362 @@
---[[
-	Admin Menu - Rediseño completo
-	LocalScript → StarterPlayerScripts
-	Solo visible y usable por el jugador local
-]]
+-- ==================================================
+-- MOBILE EXECUTOR GUI SCRIPT (AUTOMATED UI)
+-- ==================================================
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local TeleportService = game:GetService("TeleportService")
+local Stats = game:GetService("Stats")
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- =====================================================
--- CONFIGURACIÓN PERSONALIZABLE (modifique estos valores)
--- =====================================================
-local CONFIG = {
-	Theme = {
-		Background = Color3.fromRGB(22, 22, 30),
-		TitleBar = Color3.fromRGB(32, 32, 42),
-		Button = Color3.fromRGB(48, 48, 62),
-		ButtonHover = Color3.fromRGB(65, 65, 85),
-		Accent = Color3.fromRGB(90, 120, 255),
-		Text = Color3.fromRGB(240, 240, 245),
-		Stroke = Color3.fromRGB(70, 70, 90),
-	},
-	Size = UDim2.new(0, 300, 0, 460),
-	Position = UDim2.new(0.5, -150, 0.5, -230),
-	CornerRadius = UDim.new(0, 12),
-	ButtonHeight = 42,
+local GUI_NAME = "MobileAdminHub_v1"
+
+local Config = {
+    Theme = "Dark",
+    Animations = true,
+    Notifications = true,
+    Scale = 1,
+    Opacity = 0.9,
+    DashCooldown = 2,
+    FlySpeed = 50,
+    SprintMultiplier = 1.5,
+    Waypoints = {}
 }
 
--- Esperar RemoteEvent (debe crearse en el servidor)
-local RemoteEvent = ReplicatedStorage:WaitForChild("AdminRemote", 10)
-if not RemoteEvent then
-	warn("[AdminMenu] No se encontró AdminRemote en ReplicatedStorage. Cree el RemoteEvent desde el servidor.")
-	return
-end
-
--- =====================================================
--- CREACIÓN DE LA INTERFAZ
--- =====================================================
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AdminMenu"
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = playerGui
-
--- Marco principal
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = CONFIG.Size
-mainFrame.Position = CONFIG.Position
-mainFrame.BackgroundColor3 = CONFIG.Theme.Background
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.ClipsDescendants = true
-mainFrame.Parent = screenGui
-
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = CONFIG.CornerRadius
-mainCorner.Parent = mainFrame
-
-local mainStroke = Instance.new("UIStroke")
-mainStroke.Color = CONFIG.Theme.Stroke
-mainStroke.Thickness = 1.5
-mainStroke.Parent = mainFrame
-
--- Barra de título
-local titleBar = Instance.new("Frame")
-titleBar.Name = "TitleBar"
-titleBar.Size = UDim2.new(1, 0, 0, 44)
-titleBar.BackgroundColor3 = CONFIG.Theme.TitleBar
-titleBar.BorderSizePixel = 0
-titleBar.Parent = mainFrame
-
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = CONFIG.CornerRadius
-titleCorner.Parent = titleBar
-
--- Corrección visual de la esquina inferior de la barra
-local titleFix = Instance.new("Frame")
-titleFix.Size = UDim2.new(1, 0, 0, 14)
-titleFix.Position = UDim2.new(0, 0, 1, -14)
-titleFix.BackgroundColor3 = CONFIG.Theme.TitleBar
-titleFix.BorderSizePixel = 0
-titleFix.Parent = titleBar
-
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -90, 1, 0)
-titleLabel.Position = UDim2.new(0, 14, 0, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Panel de Administración"
-titleLabel.TextColor3 = CONFIG.Theme.Text
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 16
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = titleBar
-
--- Botón minimizar
-local minimizeBtn = Instance.new("TextButton")
-minimizeBtn.Size = UDim2.new(0, 36, 0, 36)
-minimizeBtn.Position = UDim2.new(1, -80, 0.5, -18)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-minimizeBtn.Text = "–"
-minimizeBtn.TextColor3 = CONFIG.Theme.Text
-minimizeBtn.Font = Enum.Font.GothamBold
-minimizeBtn.TextSize = 20
-minimizeBtn.Parent = titleBar
-
-local minCorner = Instance.new("UICorner")
-minCorner.CornerRadius = UDim.new(0, 8)
-minCorner.Parent = minimizeBtn
-
--- Botón cerrar
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 36, 0, 36)
-closeBtn.Position = UDim2.new(1, -40, 0.5, -18)
-closeBtn.BackgroundColor3 = Color3.fromRGB(180, 55, 55)
-closeBtn.Text = "×"
-closeBtn.TextColor3 = Color3.new(1, 1, 1)
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 22
-closeBtn.Parent = titleBar
-
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 8)
-closeCorner.Parent = closeBtn
-
--- Contenedor de contenido
-local contentFrame = Instance.new("Frame")
-contentFrame.Name = "Content"
-contentFrame.Size = UDim2.new(1, 0, 1, -44)
-contentFrame.Position = UDim2.new(0, 0, 0, 44)
-contentFrame.BackgroundTransparency = 1
-contentFrame.Parent = mainFrame
-
--- ScrollingFrame de comandos
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Name = "CommandList"
-scrollFrame.Size = UDim2.new(1, -16, 1, -16)
-scrollFrame.Position = UDim2.new(0, 8, 0, 8)
-scrollFrame.BackgroundTransparency = 1
-scrollFrame.BorderSizePixel = 0
-scrollFrame.ScrollBarThickness = 6
-scrollFrame.ScrollBarImageColor3 = CONFIG.Theme.Accent
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-scrollFrame.Parent = contentFrame
-
-local listLayout = Instance.new("UIListLayout")
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-listLayout.Padding = UDim.new(0, 6)
-listLayout.Parent = scrollFrame
-
-local listPadding = Instance.new("UIPadding")
-listPadding.PaddingTop = UDim.new(0, 4)
-listPadding.PaddingBottom = UDim.new(0, 8)
-listPadding.Parent = scrollFrame
-
--- =====================================================
--- LISTA DE COMANDOS (más de 25 opciones)
--- =====================================================
-local commands = {
-	{Name = "Curar", NeedsValue = false},
-	{Name = "Velocidad", NeedsValue = true, Hint = "Velocidad de caminata (16-250)"},
-	{Name = "Poder de Salto", NeedsValue = true, Hint = "Fuerza de salto (50-600)"},
-	{Name = "Activar Vuelo", NeedsValue = false},
-	{Name = "Desactivar Vuelo", NeedsValue = false},
-	{Name = "Reaparecer", NeedsValue = false},
-	{Name = "Modo Dios", NeedsValue = false},
-	{Name = "Invisibilidad", NeedsValue = false},
-	{Name = "Campo de Fuerza", NeedsValue = false},
-	{Name = "Dar Espada", NeedsValue = false},
-	{Name = "Limpiar Inventario", NeedsValue = false},
-	{Name = "Noclip", NeedsValue = false},
-	{Name = "Congelar", NeedsValue = false},
-	{Name = "Descongelar", NeedsValue = false},
-	{Name = "Efecto Fuego", NeedsValue = false},
-	{Name = "Efecto Hielo", NeedsValue = false},
-	{Name = "Efecto Chispas", NeedsValue = false},
-	{Name = "Quitar Efectos", NeedsValue = false},
-	{Name = "Sentarse", NeedsValue = false},
-	{Name = "Animación de Baile", NeedsValue = false},
-	{Name = "Aumentar Salud Máxima", NeedsValue = true, Hint = "Nueva salud máxima (100-2000)"},
-	{Name = "Gravedad", NeedsValue = true, Hint = "Gravedad (196.2 = normal)"},
-	{Name = "Tamaño del Personaje", NeedsValue = true, Hint = "Multiplicador (1 = normal)"},
-	{Name = "Color del Personaje", NeedsValue = false},
-	{Name = "Teletransporte al Spawn", NeedsValue = false},
-	{Name = "Salto Infinito", NeedsValue = false},
-	{Name = "Regeneración Rápida", NeedsValue = false},
-	{Name = "Super Velocidad", NeedsValue = false},
-	{Name = "Caminar sobre el Agua", NeedsValue = false},
-	{Name = "Quitar Todas las Restricciones", NeedsValue = false},
+local Themes = {
+    Dark = {
+        Background = Color3.fromRGB(25, 25, 30),
+        TopBar = Color3.fromRGB(35, 35, 40),
+        Text = Color3.fromRGB(255, 255, 255),
+        Accent = Color3.fromRGB(0, 150, 255),
+        Element = Color3.fromRGB(45, 45, 50),
+        Border = Color3.fromRGB(60, 60, 65)
+    },
+    Light = {
+        Background = Color3.fromRGB(240, 240, 245),
+        TopBar = Color3.fromRGB(220, 220, 225),
+        Text = Color3.fromRGB(30, 30, 30),
+        Accent = Color3.fromRGB(0, 120, 210),
+        Element = Color3.fromRGB(255, 255, 255),
+        Border = Color3.fromRGB(200, 200, 200)
+    }
 }
 
--- =====================================================
--- CREACIÓN DE BOTONES
--- =====================================================
-local function createButton(cmd, index)
-	local button = Instance.new("TextButton")
-	button.Name = cmd.Name
-	button.Size = UDim2.new(1, -8, 0, CONFIG.ButtonHeight)
-	button.BackgroundColor3 = CONFIG.Theme.Button
-	button.Text = cmd.Name
-	button.TextColor3 = CONFIG.Theme.Text
-	button.Font = Enum.Font.GothamMedium
-	button.TextSize = 15
-	button.AutoButtonColor = false
-	button.LayoutOrder = index
-	button.Parent = scrollFrame
+local States = {
+    Noclip = false,
+    Fly = false,
+    InfJump = false,
+    DoubleJump = false,
+    Sprint = false,
+    DashReady = true,
+    SavedPosition = nil,
+    SessionStart = os.time()
+}
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = button
+local Connections = {}
 
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = CONFIG.Theme.Stroke
-	stroke.Thickness = 1
-	stroke.Parent = button
+local targetGuiParent = pcall(function() return CoreGui.Name end) and CoreGui or LocalPlayer:WaitForChild("PlayerGui")
+if targetGuiParent:FindFirstChild(GUI_NAME) then
+    targetGuiParent[GUI_NAME]:Destroy()
+end
+if _G.MobileAdminConnections then
+    for _, conn in pairs(_G.MobileAdminConnections) do
+        if typeof(conn) == "RBXScriptConnection" then conn:Disconnect() end
+    end
+end
+_G.MobileAdminConnections = Connections
 
-	-- Efecto hover (escritorio)
-	button.MouseEnter:Connect(function()
-		TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = CONFIG.Theme.ButtonHover}):Play()
-	end)
-	button.MouseLeave:Connect(function()
-		TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = CONFIG.Theme.Button}):Play()
-	end)
-
-	button.MouseButton1Click:Connect(function()
-		if cmd.NeedsValue then
-			showValueModal(cmd)
-		else
-			RemoteEvent:FireServer(cmd.Name, nil)
-		end
-	end)
-
-	return button
+local function Create(className, properties)
+    local inst = Instance.new(className)
+    for k, v in pairs(properties) do inst[k] = v end
+    return inst
 end
 
-for i, cmd in ipairs(commands) do
-	createButton(cmd, i)
+local function Tween(obj, props, time)
+    if not Config.Animations then 
+        for k, v in pairs(props) do obj[k] = v end
+        return 
+    end
+    local t = TweenService:Create(obj, TweenInfo.new(time or 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+    t:Play()
+    return t
 end
 
--- =====================================================
--- MODAL DE ENTRADA DE VALOR
--- =====================================================
-local valueModal = Instance.new("Frame")
-valueModal.Name = "ValueModal"
-valueModal.Size = UDim2.new(1, -20, 0, 150)
-valueModal.Position = UDim2.new(0, 10, 0.5, -75)
-valueModal.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
-valueModal.Visible = false
-valueModal.Parent = mainFrame
-
-local modalCorner = Instance.new("UICorner")
-modalCorner.CornerRadius = UDim.new(0, 10)
-modalCorner.Parent = valueModal
-
-local modalStroke = Instance.new("UIStroke")
-modalStroke.Color = CONFIG.Theme.Accent
-modalStroke.Thickness = 1.5
-modalStroke.Parent = valueModal
-
-local modalTitle = Instance.new("TextLabel")
-modalTitle.Size = UDim2.new(1, -20, 0, 30)
-modalTitle.Position = UDim2.new(0, 10, 0, 10)
-modalTitle.BackgroundTransparency = 1
-modalTitle.Text = "Introducir valor"
-modalTitle.TextColor3 = CONFIG.Theme.Text
-modalTitle.Font = Enum.Font.GothamBold
-modalTitle.TextSize = 15
-modalTitle.TextXAlignment = Enum.TextXAlignment.Left
-modalTitle.Parent = valueModal
-
-local valueBox = Instance.new("TextBox")
-valueBox.Size = UDim2.new(1, -20, 0, 38)
-valueBox.Position = UDim2.new(0, 10, 0, 48)
-valueBox.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
-valueBox.TextColor3 = CONFIG.Theme.Text
-valueBox.PlaceholderText = "Número..."
-valueBox.PlaceholderColor3 = Color3.fromRGB(140, 140, 160)
-valueBox.Font = Enum.Font.Gotham
-valueBox.TextSize = 16
-valueBox.ClearTextOnFocus = false
-valueBox.Parent = valueModal
-
-local boxCorner = Instance.new("UICorner")
-boxCorner.CornerRadius = UDim.new(0, 8)
-boxCorner.Parent = valueBox
-
-local confirmBtn = Instance.new("TextButton")
-confirmBtn.Size = UDim2.new(0.48, -5, 0, 36)
-confirmBtn.Position = UDim2.new(0, 10, 1, -48)
-confirmBtn.BackgroundColor3 = CONFIG.Theme.Accent
-confirmBtn.Text = "Confirmar"
-confirmBtn.TextColor3 = Color3.new(1, 1, 1)
-confirmBtn.Font = Enum.Font.GothamBold
-confirmBtn.TextSize = 14
-confirmBtn.Parent = valueModal
-
-local confCorner = Instance.new("UICorner")
-confCorner.CornerRadius = UDim.new(0, 8)
-confCorner.Parent = confirmBtn
-
-local cancelBtn = Instance.new("TextButton")
-cancelBtn.Size = UDim2.new(0.48, -5, 0, 36)
-cancelBtn.Position = UDim2.new(0.52, 0, 1, -48)
-cancelBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 85)
-cancelBtn.Text = "Cancelar"
-cancelBtn.TextColor3 = CONFIG.Theme.Text
-cancelBtn.Font = Enum.Font.GothamMedium
-cancelBtn.TextSize = 14
-cancelBtn.Parent = valueModal
-
-local canCorner = Instance.new("UICorner")
-canCorner.CornerRadius = UDim.new(0, 8)
-canCorner.Parent = cancelBtn
-
-local currentCmd = nil
-
-function showValueModal(cmd)
-	currentCmd = cmd
-	modalTitle.Text = cmd.Hint or "Introducir valor"
-	valueBox.Text = ""
-	valueBox.PlaceholderText = "Número..."
-	valueModal.Visible = true
-	scrollFrame.Visible = false
+local function MakeDraggable(topbar, main)
+    local dragging, dragInput, dragStart, startPos
+    topbar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = main.Position
+        end
+    end)
+    topbar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            Tween(main, {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}, 0.1)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
 end
 
-local function hideValueModal()
-	valueModal.Visible = false
-	scrollFrame.Visible = true
-	currentCmd = nil
+local ScreenGui = Create("ScreenGui", {Name = GUI_NAME, Parent = targetGuiParent, ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling})
+local MainPanel = Create("Frame", {Parent = ScreenGui, Size = UDim2.new(0, 400, 0, 300), Position = UDim2.new(0.5, -200, 0.5, -150), BackgroundColor3 = Themes[Config.Theme].Background, BackgroundTransparency = 1 - Config.Opacity, ClipsDescendants = true})
+Create("UICorner", {Parent = MainPanel, CornerRadius = UDim.new(0, 10)})
+Create("UIStroke", {Parent = MainPanel, Color = Themes[Config.Theme].Border, Thickness = 1})
+
+local TopBar = Create("Frame", {Parent = MainPanel, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = Themes[Config.Theme].TopBar, BackgroundTransparency = 1 - Config.Opacity})
+Create("UICorner", {Parent = TopBar, CornerRadius = UDim.new(0, 10)})
+local Title = Create("TextLabel", {Parent = TopBar, Size = UDim2.new(0, 150, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = "Mobile Hub", TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left})
+
+local CloseBtn = Create("TextButton", {Parent = TopBar, Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -35, 0, 2), BackgroundTransparency = 1, Text = "X", TextColor3 = Color3.fromRGB(255, 50, 50), Font = Enum.Font.GothamBold, TextSize = 16})
+local MinBtn = Create("TextButton", {Parent = TopBar, Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundTransparency = 1, Text = "-", TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamBold, TextSize = 18})
+
+local SearchBar = Create("TextBox", {Parent = TopBar, Size = UDim2.new(0, 120, 0, 25), Position = UDim2.new(1, -200, 0, 5), BackgroundColor3 = Themes[Config.Theme].Element, TextColor3 = Themes[Config.Theme].Text, PlaceholderText = "Search...", Font = Enum.Font.Gotham, TextSize = 12, ClearTextOnFocus = false})
+Create("UICorner", {Parent = SearchBar, CornerRadius = UDim.new(0, 5)})
+
+local ContentContainer = Create("Frame", {Parent = MainPanel, Size = UDim2.new(1, 0, 1, -35), Position = UDim2.new(0, 0, 0, 35), BackgroundTransparency = 1})
+local CategoryList = Create("ScrollingFrame", {Parent = ContentContainer, Size = UDim2.new(0, 100, 1, -10), Position = UDim2.new(0, 5, 0, 5), BackgroundTransparency = 1, ScrollBarThickness = 2, CanvasSize = UDim2.new(0,0,0,0)})
+Create("UIListLayout", {Parent = CategoryList, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5)})
+
+local FloatBtn = Create("TextButton", {Parent = ScreenGui, Size = UDim2.new(0, 40, 0, 40), Position = UDim2.new(0, 10, 0, 10), BackgroundColor3 = Themes[Config.Theme].Accent, Text = "UI", TextColor3 = Color3.fromRGB(255,255,255), Font = Enum.Font.GothamBold, TextSize = 16, Visible = false})
+Create("UICorner", {Parent = FloatBtn, CornerRadius = UDim.new(1, 0)})
+
+MakeDraggable(TopBar, MainPanel)
+MakeDraggable(FloatBtn, FloatBtn)
+
+local NotifContainer = Create("Frame", {Parent = ScreenGui, Size = UDim2.new(0, 200, 1, 0), Position = UDim2.new(1, -210, 0, 0), BackgroundTransparency = 1})
+Create("UIListLayout", {Parent = NotifContainer, VerticalAlignment = Enum.VerticalAlignment.Bottom, Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder})
+
+local function Notify(text)
+    if not Config.Notifications then return end
+    local notif = Create("TextLabel", {Parent = NotifContainer, Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = Themes[Config.Theme].TopBar, TextColor3 = Themes[Config.Theme].Text, Text = " " .. text, Font = Enum.Font.GothamSemibold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1, TextTransparency = 1})
+    Create("UICorner", {Parent = notif, CornerRadius = UDim.new(0, 5)})
+    Create("UIStroke", {Parent = notif, Color = Themes[Config.Theme].Accent, Thickness = 1})
+    
+    Tween(notif, {BackgroundTransparency = 0.2, TextTransparency = 0, Position = UDim2.new(0,0,0,0)}, 0.3)
+    task.delay(3, function()
+        Tween(notif, {BackgroundTransparency = 1, TextTransparency = 1, Position = UDim2.new(1,0,0,0)}, 0.3)
+        task.wait(0.3)
+        notif:Destroy()
+    end)
 end
 
-confirmBtn.MouseButton1Click:Connect(function()
-	local num = tonumber(valueBox.Text)
-	if num and currentCmd then
-		RemoteEvent:FireServer(currentCmd.Name, num)
-		hideValueModal()
-	else
-		valueBox.PlaceholderText = "Valor inválido"
-		valueBox.Text = ""
-	end
+local ActiveTab = nil
+local SearchableElements = {}
+
+local function AddCategory(name)
+    local tabBtn = Create("TextButton", {Parent = CategoryList, Size = UDim2.new(1, 0, 0, 25), BackgroundColor3 = Themes[Config.Theme].Element, Text = name, TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.Gotham, TextSize = 12})
+    Create("UICorner", {Parent = tabBtn, CornerRadius = UDim.new(0, 5)})
+    
+    local scrollFrame = Create("ScrollingFrame", {Parent = ContentContainer, Size = UDim2.new(1, -115, 1, -10), Position = UDim2.new(0, 110, 0, 5), BackgroundTransparency = 1, ScrollBarThickness = 3, Visible = false})
+    Create("UIListLayout", {Parent = scrollFrame, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5)})
+    
+    tabBtn.MouseButton1Click:Connect(function()
+        if ActiveTab then ActiveTab.Visible = false end
+        scrollFrame.Visible = true
+        ActiveTab = scrollFrame
+        Tween(scrollFrame, {CanvasPosition = Vector2.new(0,0)}, 0.2)
+    end)
+    if not ActiveTab then ActiveTab = scrollFrame; scrollFrame.Visible = true end
+    CategoryList.CanvasSize = UDim2.new(0, 0, 0, #CategoryList:GetChildren() * 30)
+
+    local function RegisterElement(frame, elName)
+        table.insert(SearchableElements, {Frame = frame, Name = elName:lower()})
+    end
+
+    local TabObj = {}
+    function TabObj:AddButton(text, callback)
+        local btn = Create("TextButton", {Parent = scrollFrame, Size = UDim2.new(1, -10, 0, 30), BackgroundColor3 = Themes[Config.Theme].Element, Text = text, TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamSemibold, TextSize = 13})
+        Create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 5)})
+        btn.MouseButton1Click:Connect(function() Tween(btn, {Size = UDim2.new(1, -15, 0, 28)}, 0.1); task.wait(0.1); Tween(btn, {Size = UDim2.new(1, -10, 0, 30)}, 0.1); pcall(callback) end)
+        RegisterElement(btn, text)
+        scrollFrame.CanvasSize = UDim2.new(0,0,0, #scrollFrame:GetChildren() * 35)
+    end
+    
+    function TabObj:AddToggle(text, callback)
+        local frame = Create("Frame", {Parent = scrollFrame, Size = UDim2.new(1, -10, 0, 30), BackgroundColor3 = Themes[Config.Theme].Element})
+        Create("UICorner", {Parent = frame, CornerRadius = UDim.new(0, 5)})
+        local label = Create("TextLabel", {Parent = frame, Size = UDim2.new(0.7, 0, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = text, TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamSemibold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left})
+        local btn = Create("TextButton", {Parent = frame, Size = UDim2.new(0, 40, 0, 20), Position = UDim2.new(1, -50, 0.5, -10), BackgroundColor3 = Color3.fromRGB(100, 100, 100), Text = ""})
+        Create("UICorner", {Parent = btn, CornerRadius = UDim.new(1, 0)})
+        local indicator = Create("Frame", {Parent = btn, Size = UDim2.new(0, 16, 0, 16), Position = UDim2.new(0, 2, 0.5, -8), BackgroundColor3 = Color3.fromRGB(255,255,255)})
+        Create("UICorner", {Parent = indicator, CornerRadius = UDim.new(1, 0)})
+        
+        local state = false
+        btn.MouseButton1Click:Connect(function()
+            state = not state
+            Tween(indicator, {Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}, 0.2)
+            Tween(btn, {BackgroundColor3 = state and Themes[Config.Theme].Accent or Color3.fromRGB(100, 100, 100)}, 0.2)
+            pcall(callback, state)
+        end)
+        RegisterElement(frame, text)
+        scrollFrame.CanvasSize = UDim2.new(0,0,0, #scrollFrame:GetChildren() * 35)
+        return function(newState) state = newState; Tween(indicator, {Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}, 0.2); Tween(btn, {BackgroundColor3 = state and Themes[Config.Theme].Accent or Color3.fromRGB(100, 100, 100)}, 0.2) end
+    end
+    
+    function TabObj:AddSlider(text, min, max, callback)
+        local frame = Create("Frame", {Parent = scrollFrame, Size = UDim2.new(1, -10, 0, 40), BackgroundColor3 = Themes[Config.Theme].Element})
+        Create("UICorner", {Parent = frame, CornerRadius = UDim.new(0, 5)})
+        local label = Create("TextLabel", {Parent = frame, Size = UDim2.new(1, -10, 0.5, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = text, TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamSemibold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left})
+        local valLabel = Create("TextLabel", {Parent = frame, Size = UDim2.new(0, 30, 0.5, 0), Position = UDim2.new(1, -40, 0, 0), BackgroundTransparency = 1, Text = tostring(min), TextColor3 = Themes[Config.Theme].Accent, Font = Enum.Font.GothamBold, TextSize = 12})
+        local bar = Create("TextButton", {Parent = frame, Size = UDim2.new(1, -20, 0, 5), Position = UDim2.new(0, 10, 0.7, 0), BackgroundColor3 = Color3.fromRGB(100, 100, 100), Text = ""})
+        local fill = Create("Frame", {Parent = bar, Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Themes[Config.Theme].Accent})
+        
+        local dragging = false
+        local function Update(input)
+            local pos = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+            local val = math.floor(min + (max - min) * pos)
+            fill.Size = UDim2.new(pos, 0, 1, 0)
+            valLabel.Text = tostring(val)
+            pcall(callback, val)
+        end
+        bar.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; Update(input) end end)
+        UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
+        UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then Update(input) end end)
+        RegisterElement(frame, text)
+        scrollFrame.CanvasSize = UDim2.new(0,0,0, #scrollFrame:GetChildren() * 45)
+    end
+    
+    function TabObj:AddInput(text, callback)
+        local frame = Create("Frame", {Parent = scrollFrame, Size = UDim2.new(1, -10, 0, 30), BackgroundColor3 = Themes[Config.Theme].Element})
+        Create("UICorner", {Parent = frame, CornerRadius = UDim.new(0, 5)})
+        local label = Create("TextLabel", {Parent = frame, Size = UDim2.new(0.5, 0, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = text, TextColor3 = Themes[Config.Theme].Text, Font = Enum.Font.GothamSemibold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left})
+        local box = Create("TextBox", {Parent = frame, Size = UDim2.new(0.4, 0, 0, 20), Position = UDim2.new(0.6, -10, 0.5, -10), BackgroundColor3 = Themes[Config.Theme].Background, TextColor3 = Themes[Config.Theme].Text, Text = "", PlaceholderText = "Input...", Font = Enum.Font.Gotham, TextSize = 12, ClearTextOnFocus = false})
+        Create("UICorner", {Parent = box, CornerRadius = UDim.new(0, 3)})
+        box.FocusLost:Connect(function() pcall(callback, box.Text) end)
+        RegisterElement(frame, text)
+        scrollFrame.CanvasSize = UDim2.new(0,0,0, #scrollFrame:GetChildren() * 35)
+    end
+
+    function TabObj:AddLabel(text)
+        local lbl = Create("TextLabel", {Parent = scrollFrame, Size = UDim2.new(1, -10, 0, 20), BackgroundTransparency = 1, Text = text, TextColor3 = Themes[Config.Theme].Accent, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Center})
+        RegisterElement(lbl, text)
+        scrollFrame.CanvasSize = UDim2.new(0,0,0, #scrollFrame:GetChildren() * 25)
+        return lbl
+    end
+
+    return TabObj
+end
+
+SearchBar:GetPropertyChangedSignal("Text"):Connect(function()
+    local text = SearchBar.Text:lower()
+    for _, el in pairs(SearchableElements) do
+        if text == "" or string.find(el.Name, text) then
+            el.Frame.Visible = true
+        else
+            el.Frame.Visible = false
+        end
+    end
 end)
 
-cancelBtn.MouseButton1Click:Connect(function()
-	hideValueModal()
+local Minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    Minimized = not Minimized
+    if Minimized then
+        Tween(MainPanel, {Size = UDim2.new(0, 400, 0, 35)}, 0.3)
+        ContentContainer.Visible = false
+    else
+        Tween(MainPanel, {Size = UDim2.new(0, 400, 0, 300)}, 0.3)
+        task.wait(0.3)
+        ContentContainer.Visible = true
+    end
 end)
 
--- =====================================================
--- SISTEMA DE ARRASTRE (ratón + táctil)
--- =====================================================
-local dragging = false
-local dragStart = nil
-local startPos = nil
+CloseBtn.MouseButton1Click:Connect(function()
+    Tween(MainPanel, {Size = UDim2.new(0,0,0,0)}, 0.3)
+    task.wait(0.3)
+    MainPanel.Visible = false
+    FloatBtn.Visible = true
+    Tween(FloatBtn, {Size = UDim2.new(0, 40, 0, 40)}, 0.2)
+end)
 
-local function beginDrag(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = true
-		dragStart = input.Position
-		startPos = mainFrame.Position
-	end
+FloatBtn.MouseButton1Click:Connect(function()
+    FloatBtn.Visible = false
+    MainPanel.Visible = true
+    Tween(MainPanel, {Size = UDim2.new(0, 400, 0, 300)}, 0.3)
+end)
+
+local function GetChar()
+    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+end
+local function GetHumanoid()
+    local c = GetChar()
+    return c:FindFirstChildOfClass("Humanoid")
+end
+local function GetRoot()
+    local c = GetChar()
+    return c:FindFirstChild("HumanoidRootPart")
 end
 
-local function updateDrag(input)
-	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-		local delta = input.Position - dragStart
-		mainFrame.Position = UDim2.new(
-			startPos.X.Scale,
-			startPos.X.Offset + delta.X,
-			startPos.Y.Scale,
-			startPos.Y.Offset + delta.Y
-		)
-	end
-end
+local TabMovement = AddCategory("MOVEMENT")
+local TabFlight = AddCategory("FLIGHT")
+local TabCharacter = AddCategory("CHARACTER")
+local TabTeleport = AddCategory("TELEPORT")
+local TabCamera = AddCategory("CAMERA")
+local TabVisual = AddCategory("VISUAL")
+local TabUtils = AddCategory("UTILITIES")
+local TabSettings = AddCategory("SETTINGS")
 
-local function endDrag(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = false
-	end
-end
+TabMovement:AddLabel("-- SPEED --")
+TabMovement:AddSlider("1. WalkSpeed", 16, 200, function(v) local h = GetHumanoid(); if h then h.WalkSpeed = v end end)
+TabMovement:AddButton("2. Speed Preset: Normal", function() local h=GetHumanoid() if h then h.WalkSpeed=16 end Notify("Speed: Normal") end)
+TabMovement:AddButton("2. Speed Preset: Fast", function() local h=GetHumanoid() if h then h.WalkSpeed=50 end Notify("Speed: Fast") end)
+TabMovement:AddButton("2. Speed Preset: Extreme", function() local h=GetHumanoid() if h then h.WalkSpeed=150 end Notify("Speed: Extreme") end)
 
-titleBar.InputBegan:Connect(beginDrag)
-titleBar.InputChanged:Connect(updateDrag)
-titleBar.InputEnded:Connect(endDrag)
+TabMovement:AddLabel("-- JUMP --")
+TabMovement:AddSlider("3. JumpPower", 50, 300, function(v) local h = GetHumanoid(); if h then h.UseJumpPower = true; h.JumpPower = v end end)
+TabMovement:AddButton("4. Jump Preset: Normal", function() local h=GetHumanoid() if h then h.UseJumpPower=true; h.JumpPower=50 end Notify("Jump: Normal") end)
+TabMovement:AddButton("4. Jump Preset: High", function() local h=GetHumanoid() if h then h.UseJumpPower=true; h.JumpPower=150 end Notify("Jump: High") end)
 
-UserInputService.InputChanged:Connect(function(input)
-	if dragging then
-		updateDrag(input)
-	end
+TabMovement:AddToggle("5. Infinite Jump", function(st)
+    States.InfJump = st
+    Notify("Inf Jump: " .. tostring(st))
 end)
+table.insert(Connections, UserInputService.JumpRequest:Connect(function()
+    if States.InfJump then
+        local h = GetHumanoid()
+        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end))
 
-UserInputService.InputEnded:Connect(function(input)
-	endDrag(input)
+TabMovement:AddToggle("6. Double Jump", function(st)
+    States.DoubleJump = st
+    Notify("Double Jump: " .. tostring(st))
 end)
+local jumpCount = 0
+table.insert(Connections, UserInputService.JumpRequest:Connect(function()
+    if States.DoubleJump then
+        local h = GetHumanoid()
+        if h and h:GetState() == Enum.HumanoidStateType.Freefall and jumpCount == 0 then
+            jumpCount = 1
+            h:ChangeState(Enum.HumanoidStateType.Jumping)
+        elseif h and h:GetState() == Enum.HumanoidStateType.Landed then
+            jumpCount = 0
+        end
+    end
+end))
 
--- =====================================================
--- BOTONES DE CONTROL
--- =====================================================
-local minimized = false
-
-minimizeBtn.MouseButton1Click:Connect(function()
-	minimized = not minimized
-	if minimized then
-		contentFrame.Visible = false
-		mainFrame.Size = UDim2.new(CONFIG.Size.X.Scale, CONFIG.Size.X.Offset, 0, 44)
-		minimizeBtn.Text = "+"
-	else
-		contentFrame.Visible = true
-		mainFrame.Size = CONFIG.Size
-		minimizeBtn.Text = "–"
-	end
-end)
-
-closeBtn.MouseButton1Click:Connect(function()
-	screenGui:Destroy()
-end)
-
--- =====================================================
--- AJUSTES FINALES PARA MÓVILES
--- =====================================================
-if UserInputService.TouchEnabled then
-	-- Aumentar ligeramente el tamaño de los botones en dispositivos táctiles
-	for _, child in ipairs(scrollFrame:GetChildren()) do
-		if child:IsA("TextButton") then
-			child.Size = UDim2.new(1, -8, 0, 48)
-		end
-	end
-end
-
-print("[AdminMenu] Interfaz cargada correctamente.")
+TabMovement:AddToggle("7. Sprint", function(st) States.Sprint = st; Notify("Sprint: " .. tostring(st)) end)
+TabMovement:AddSlider("8. Sprint Multiplier", 1, 5, function(v) Config.SprintMultiplier = v end)
+table.insert(Connections, RunService.Heartbeat:Connect(function()
+    if States.Sprint then
+        local h = GetHumanoid()
+        if h and h.MoveDirection.Magnitude > 0 then
+            h.WalkSpeed = 16 * Config.SprintMultiplier
+        else
+            if h then h.WalkSpeed = 16 end
+      
